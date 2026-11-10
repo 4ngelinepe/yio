@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/* Marcas: cada archivo define las mismas variables bajo [data-theme="…"] */
+@import "./themes/wireframe.css";
+@import "./themes/geo.css";
+@import "./themes/av.css";
+
+/*
+ * Puente Tailwind ↔ tokens.
+ * Los componentes SOLO usan estas clases (bg-surface, text-muted, bg-success…).
+ * Nunca colores crudos. Así cambiar de marca = cambiar variables.
+ */
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-display: var(--font-heading);
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-line: var(--border);
+  --color-ink: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-text: var(--primary-text);
+
+  /* Tonos semánticos: solid / soft / border / text */
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+  --color-info-text: var(--info-text);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-border: var(--success-border);
+  --color-success-text: var(--success-text);
+
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+  --color-warning-text: var(--warning-text);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-border: var(--danger-border);
+  --color-danger-text: var(--danger-text);
+
+  --color-highlight: var(--highlight);
+  --color-highlight-soft: var(--highlight-soft);
+  --color-highlight-border: var(--highlight-border);
+  --color-highlight-text: var(--highlight-text);
+
+  --color-energy: var(--energy);
+  --color-energy-soft: var(--energy-soft);
+  --color-energy-border: var(--energy-border);
+  --color-energy-text: var(--energy-text);
+
+  --color-neutral: var(--neutral);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-neutral-border: var(--neutral-border);
+  --color-neutral-text: var(--neutral-text);
+
+  --radius-control: var(--radius-sm);
+  --radius-tile: var(--radius-md);
+  --radius-card: var(--radius-lg);
+
+  --shadow-card: var(--shadow);
+}
+
+@layer base {
+  html {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-heading);
+  }
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+}
+
+/* Patrón de "imagen pendiente" del wireframe */
+.image-slot {
+  background-color: var(--surface-muted);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 14px,
+    var(--border) 14px 15px
+  );
+}

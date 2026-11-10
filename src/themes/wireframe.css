@@ -1,0 +1,62 @@
+/*
+ * WIREFRAME — tema por defecto.
+ * Solo grises. Los tonos semánticos se distinguen por intensidad, no por color,
+ * para discutir estructura sin que el color distraiga.
+ */
+[data-theme="wireframe"] {
+  --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-heading: var(--font-body);
+
+  --bg: #f4f4f5;
+  --surface: #ffffff;
+  --surface-muted: #f4f4f5;
+  --border: #d4d4d8;
+  --text: #18181b;
+  --text-muted: #52525b;
+  --text-subtle: #a1a1aa;
+
+  --primary: #3f3f46;
+  --primary-fg: #ffffff;
+  --primary-soft: #f4f4f5;
+  --primary-text: #18181b;
+
+  --info: #52525b;
+  --info-soft: #fafafa;
+  --info-border: #d4d4d8;
+  --info-text: #27272a;
+
+  --success: #27272a;
+  --success-soft: #f4f4f5;
+  --success-border: #71717a;
+  --success-text: #18181b;
+
+  --warning: #71717a;
+  --warning-soft: #fafafa;
+  --warning-border: #a1a1aa;
+  --warning-text: #3f3f46;
+
+  --danger: #a1a1aa;
+  --danger-soft: #fafafa;
+  --danger-border: #d4d4d8;
+  --danger-text: #3f3f46;
+
+  --highlight: #52525b;
+  --highlight-soft: #fafafa;
+  --highlight-border: #d4d4d8;
+  --highlight-text: #27272a;
+
+  --energy: #52525b;
+  --energy-soft: #fafafa;
+  --energy-border: #d4d4d8;
+  --energy-text: #27272a;
+
+  --neutral: #a1a1aa;
+  --neutral-soft: #fafafa;
+  --neutral-border: #e4e4e7;
+  --neutral-text: #3f3f46;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow: none;
+}

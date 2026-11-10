@@ -1,0 +1,61 @@
+/*
+ * GEO — reproduce la propuesta visual original del Figma Make.
+ * Sirve de referencia de cómo se ve el MVP con una marca "colorida".
+ */
+[data-theme="geo"] {
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-body);
+
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-muted: #f8fafc;
+  --border: #e5e7eb;
+  --text: #111827;
+  --text-muted: #4b5563;
+  --text-subtle: #9ca3af;
+
+  --primary: #2563eb;
+  --primary-fg: #ffffff;
+  --primary-soft: #eff6ff;
+  --primary-text: #1e3a8a;
+
+  --info: #2563eb;
+  --info-soft: #eaf1fd;
+  --info-border: #bfd4fb;
+  --info-text: #1e3a8a;
+
+  --success: #3da64b;
+  --success-soft: #f0fbf2;
+  --success-border: #86e09a;
+  --success-text: #1f6b2b;
+
+  --warning: #ea580c;
+  --warning-soft: #fff7ed;
+  --warning-border: #fdba74;
+  --warning-text: #c2410c;
+
+  --danger: #e53935;
+  --danger-soft: #fef2f2;
+  --danger-border: #fca5a5;
+  --danger-text: #b91c1c;
+
+  --highlight: #9333ea;
+  --highlight-soft: #f6f0fd;
+  --highlight-border: #e4d4fb;
+  --highlight-text: #6b21a8;
+
+  --energy: #ea580c;
+  --energy-soft: #fff7ed;
+  --energy-border: #fed7aa;
+  --energy-text: #c2410c;
+
+  --neutral: #9ca3af;
+  --neutral-soft: #f9fafb;
+  --neutral-border: #e5e7eb;
+  --neutral-text: #374151;
+
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --shadow: 0 10px 30px -12px rgb(15 23 42 / 0.15);
+}

@@ -1,0 +1,62 @@
+/*
+ * ALFABETO VISUAL — paleta "Accent Paper Ink" (Manual de marca AV 2026).
+ * Paper 50 #F7F2EC · Paper 200 #EEE3DB · V500 #0A8742 · Ink #262626
+ * Tipografía: Nunito Sans. Sobria: un solo acento, el resto tinta y papel.
+ */
+[data-theme="av"] {
+  --font-body: "Nunito Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-body);
+
+  --bg: #eee3db;          /* Paper 200 */
+  --surface: #f7f2ec;     /* Paper 50 */
+  --surface-muted: #eee3db;
+  --border: #d9cbbf;
+  --text: #262626;        /* Ink */
+  --text-muted: #5a5550;
+  --text-subtle: #9b928a;
+
+  --primary: #0a8742;     /* V500 */
+  --primary-fg: #f7f2ec;
+  --primary-soft: #e3eee3;
+  --primary-text: #075c2d;
+
+  --info: #262626;
+  --info-soft: #f7f2ec;
+  --info-border: #d9cbbf;
+  --info-text: #262626;
+
+  --success: #0a8742;
+  --success-soft: #e6efe3;
+  --success-border: #0a8742;
+  --success-text: #075c2d;
+
+  --warning: #8a5a1f;
+  --warning-soft: #f5ebdc;
+  --warning-border: #d4b48a;
+  --warning-text: #6e4614;
+
+  --danger: #9b2c22;
+  --danger-soft: #f6e4df;
+  --danger-border: #d9a39a;
+  --danger-text: #7a2019;
+
+  --highlight: #262626;
+  --highlight-soft: #f7f2ec;
+  --highlight-border: #d9cbbf;
+  --highlight-text: #262626;
+
+  --energy: #5a5550;
+  --energy-soft: #f7f2ec;
+  --energy-border: #d9cbbf;
+  --energy-text: #262626;
+
+  --neutral: #9b928a;
+  --neutral-soft: #f3ece5;
+  --neutral-border: #d9cbbf;
+  --neutral-text: #3d3935;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --shadow: none;
+}
