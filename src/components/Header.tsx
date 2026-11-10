@@ -43,9 +43,9 @@ export function Header() {
         <nav id="main-menu" className="border-t border-line bg-surface">
           <ul className="mx-auto max-w-6xl px-4 py-2 sm:px-6">
             {menuLinks.map((l) => (
-              <li key={l}>
-                <a href="#" className="block rounded-control px-3 py-3 text-ink hover:bg-surface-muted">
-                  {l}
+              <li key={l.label}>
+                <a href={l.href} onClick={() => setOpen(false)} className="block rounded-control px-3 py-3 text-ink hover:bg-surface-muted">
+                  {l.label}
                 </a>
               </li>
             ))}

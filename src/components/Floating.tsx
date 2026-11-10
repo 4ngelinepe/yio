@@ -12,8 +12,8 @@ export function HelpButton() {
         <div role="dialog" aria-label="Ayuda" className="w-72 rounded-tile border border-line bg-surface p-4 text-sm text-muted shadow-card">
           <p className="font-medium text-ink">¿Cómo funciona?</p>
           <p className="mt-2">
-            Elige qué buscas hoy y te recomendamos si conviene caminar el corredor,
-            cuánto ahorras y qué alternativa evitar.
+            Elige tu tramo en el Corredor Rojo y qué buscas hoy. GEO compara caminar,
+            el bus y el taxi con el clima y el aire de ahora, y te dice qué conviene.
           </p>
         </div>
       )}
