@@ -2,6 +2,8 @@
 
 Recomendador de corredores para caminar: el usuario elige qué busca hoy (moverse rápido, ahorrar, evitar tráfico, sentirse mejor) y GEO le dice si conviene caminar el tramo, cuánto ahorra y cómo se compara con taxi o bus.
 
+**Demo en vivo:** https://4ngelinepe.github.io/geo-wireframe-mvp/
+
 Este repo es un **MVP en wireframe**: la estructura, el flujo y los componentes están resueltos; la marca se enchufa después cambiando un solo archivo.
 
 ## Correr el proyecto
