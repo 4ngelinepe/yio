@@ -1,10 +1,19 @@
-# GEO · Wireframe MVP
+# GEO
 
-Recomendador de corredores para caminar: el usuario elige qué busca hoy (moverse rápido, ahorrar, evitar tráfico, sentirse mejor) y GEO le dice si conviene caminar el tramo, cuánto ahorra y cómo se compara con taxi o bus.
+¿Camino o tomo el bus? GEO compara caminar, el Corredor Rojo y el taxi para tu tramo, con el clima y el aire de ahora, y te dice qué conviene según lo que buscas hoy: moverte rápido, ahorrar, evitar tráfico o sentirte mejor.
 
 **Demo en vivo:** https://4ngelinepe.github.io/geo-wireframe-mvp/
 
-Este repo es un **MVP en wireframe**: la estructura, el flujo y los componentes están resueltos; la marca se enchufa después cambiando un solo archivo.
+Una idea de Angie Saravia Gigante. Fase 1: uso personal y con amigos, solo Corredor Rojo.
+
+## Qué hace hoy
+
+- Tramos entre 144 paraderos del Corredor Rojo (rutas 201, 204, 206, 209).
+- Recomendación caminar vs. bus con reglas transparentes (ver `src/lib/engine.ts`). El taxi se usa solo como referencia de ahorro.
+- Clima y calidad del aire en vivo (Open-Meteo).
+- Llegadas del bus en vivo vía intermediario (`supabase/functions/rojo-arrivals`); si no responde, usa espera estimada.
+- Mapa del tramo (Leaflet + OpenStreetMap).
+- Login sin contraseña (link al correo) y "Mis ahorros" en la nube con Supabase. Sin sesión, se guarda en el dispositivo.
 
 ## Correr el proyecto
 
@@ -14,64 +23,38 @@ npm run dev      # http://localhost:5173
 npm run build    # typecheck + build a /dist
 ```
 
-Previsualiza cualquier tema con `?theme=wireframe`, `?theme=geo` o `?theme=av`, o con el selector flotante abajo a la izquierda.
+Cada push a `main` se publica solo en GitHub Pages (`.github/workflows/deploy.yml`).
 
-## Cómo ponerle marca
+## Datos y fuentes
 
-La marca vive en dos lugares. Los componentes **no tienen colores ni fuentes escritas a mano**: solo usan tokens.
+| Dato | Fuente | Archivo |
+|---|---|---|
+| Paraderos y rutas del Rojo | ubicATUbus (app.corredorrojo.pe), snapshot 10 nov 2026 | `src/data/rojo.json`, `src/data/rojo.ts` |
+| Corredores Azul y Morado (aún sin uso) | Webs oficiales | `src/data/bus-routes.ts` |
+| Clima y aire | Open-Meteo (gratis, no comercial) | `src/lib/live.ts` |
+| Llegadas en vivo | API del Rojo vía Edge Function | `supabase/functions/rojo-arrivals` |
+
+El API del Rojo no es público para terceros: el uso en Fase 1 es moderado y personal. Antes de cualquier uso comercial, pedir permiso a la ATU/operador.
+
+## Supabase
+
+- Proyecto: `geo` (región us-west-2).
+- Esquema y reglas de seguridad (RLS): `supabase/schema.sql`, se pega en SQL Editor.
+- La URL y la llave *publishable* en `src/lib/supabase.ts` son públicas por diseño. **Nunca** poner la llave *secret/service_role* en el código.
+
+## Marca enchufable
+
+Los componentes solo usan tokens. Para cambiar de marca:
 
 | Qué cambia | Dónde |
 |---|---|
 | Colores, tipografía, radios, sombras | `src/themes/<marca>.css` |
-| Logo, nombre del producto, sitio, imagen del mapa | `src/config/brand.ts` |
-| Textos y números (mock) | `src/data/content.ts` |
+| Logo, nombres | `src/config/brand.ts` |
+| Textos fijos | `src/data/content.ts` |
 
-### Agregar una marca nueva
+Para agregar una marca: duplicar `src/themes/wireframe.css`, cambiar el selector a `[data-theme="mimarca"]` y los valores (sin agregar ni quitar variables), importarlo en `src/styles.css` y sumarlo a `themes` en `brand.ts`.
 
-1. Duplica `src/themes/wireframe.css` → `src/themes/mimarca.css` y cambia el selector a `[data-theme="mimarca"]`.
-2. Cambia los valores de las variables. **No agregues ni quites variables**: todas las marcas comparten el mismo contrato.
-3. Impórtalo en `src/styles.css`.
-4. Agrega `"mimarca"` al arreglo `themes` en `src/config/brand.ts` y, si quieres, ponlo como `defaultTheme`.
-5. Si la marca usa una fuente web, agrégala en `index.html`.
+## Siguiente
 
-### El contrato de tokens
-
-- **Base:** `--bg`, `--surface`, `--surface-muted`, `--border`, `--text`, `--text-muted`, `--text-subtle`
-- **Primario:** `--primary`, `--primary-fg`, `--primary-soft`, `--primary-text`
-- **Tonos semánticos:** `info`, `success`, `warning`, `danger`, `highlight`, `energy` y `neutral`. Cada uno con `--x` (sólido), `--x-soft` (fondo), `--x-border` y `--x-text`.
-- **Forma:** `--radius-sm`, `--radius-md`, `--radius-lg`, `--shadow`
-- **Tipo:** `--font-body`, `--font-heading`
-
-Los tonos tienen significado, no color: `success` = opción recomendada / corredor respirable; `warning` = moderado / congestión; `danger` = evitar / destino; `highlight` y `energy` = métricas secundarias. Cada marca decide qué color le da a cada significado.
-
-## Estructura
-
-```
-src/
-  App.tsx                    flujo: objetivo → calcular → resultados
-  config/brand.ts            identidad (logo, nombres, tema por defecto)
-  data/content.ts            contenido mock + getRecommendation(goal)
-  themes/*.css               una marca por archivo
-  styles.css                 puente Tailwind ↔ tokens
-  lib/tones.ts               tono semántico → clases
-  components/
-    Header.tsx               logo, saludo, menú hamburguesa
-    DailyRecommendation.tsx  clima + "¿Qué buscas hoy?" + CTA
-    CorridorStatus.tsx       estado del corredor (semáforo de 3 niveles)
-    MapSection.tsx           mapa con ruta origen → vía → destino
-    RouteSummary.tsx         métricas de hoy + guardar ahorro
-    DirectComparison.tsx     taxi/bus vs caminar (recomendado)
-    CumulativeImpact.tsx     impacto si se repite 20 días/mes
-    InspirationalQuote.tsx   frase de cierre
-    Footer.tsx
-    Floating.tsx             botón de ayuda + selector de temas
-    ui/                      Card, Button, IconTile, StatTile, Icon
-```
-
-## Siguientes pasos para el back
-
-- Reemplazar `getRecommendation()` en `src/data/content.ts` por la llamada a la API. Debe devolver el tipo `Recommendation` tal cual.
-- Clima real en `weather` y usuario real en `brand.userName`.
-- "Guardar mi ahorro" hoy solo cambia de estado en pantalla; conectarlo al endpoint de ahorros.
-- `MapSection` tiene un slot de imagen: cambiarlo por un mapa real (Mapbox/Leaflet) cuando haya coordenadas.
-- Apagar `showThemeSwitcher` en producción.
+- Fase 1: invitar amigos y medir uso real.
+- Fase 2: API y widget marca blanca para billeteras (TAPP).

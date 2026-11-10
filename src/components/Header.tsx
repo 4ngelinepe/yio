@@ -1,10 +1,26 @@
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { LogIn, Menu, X } from "lucide-react";
 import { brand } from "../config/brand";
 import { menuLinks } from "../data/content";
 
-export function Header() {
+type Props = { email: string | null; onLogin: () => void; onLogout: () => void };
+
+const nameFrom = (email: string) => email.split("@")[0];
+
+export function Header({ email, onLogin, onLogout }: Props) {
   const [open, setOpen] = useState(false);
+
+  const account = email ? (
+    <>
+      <span className="truncate">Hola, {nameFrom(email)}</span>
+      <span className="text-subtle">·</span>
+      <button type="button" onClick={onLogout} className="hover:text-ink">Salir</button>
+    </>
+  ) : (
+    <button type="button" onClick={onLogin} className="inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-primary hover:bg-primary-soft">
+      <LogIn className="size-4" /> Entrar
+    </button>
+  );
 
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface">
@@ -17,26 +33,23 @@ export function Header() {
               {brand.logoMark}
             </span>
           )}
-          <span className="text-subtle">|</span>
-          <span className="truncate text-sm text-muted">{brand.siteName}</span>
+          <span className="hidden text-subtle sm:inline">|</span>
+          <span className="hidden truncate text-sm text-muted sm:inline">{brand.siteName}</span>
         </a>
 
-        <div className="hidden items-center gap-3 text-sm text-muted md:flex">
-          <span>Hola, {brand.userName}</span>
-          <span className="text-subtle">·</span>
-          <button type="button" className="hover:text-ink">Salir</button>
+        <div className="flex min-w-0 items-center gap-2 text-sm text-muted">
+          <div className="flex min-w-0 items-center gap-3">{account}</div>
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls="main-menu"
+            aria-label={open ? "Cerrar menú" : "Abrir menú"}
+            className="grid size-10 shrink-0 place-items-center rounded-control text-ink hover:bg-surface-muted"
+          >
+            {open ? <X className="size-6" /> : <Menu className="size-6" />}
+          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          aria-expanded={open}
-          aria-controls="main-menu"
-          aria-label={open ? "Cerrar menú" : "Abrir menú"}
-          className="grid size-10 place-items-center rounded-control text-ink hover:bg-surface-muted"
-        >
-          {open ? <X className="size-6" /> : <Menu className="size-6" />}
-        </button>
       </div>
 
       {open && (
@@ -49,10 +62,7 @@ export function Header() {
                 </a>
               </li>
             ))}
-            <li className="border-t border-line md:hidden">
-              <span className="block px-3 pt-3 text-sm text-muted">Hola, {brand.userName}</span>
-              <button type="button" className="px-3 py-3 text-ink">Salir</button>
-            </li>
+            {email && <li className="px-3 py-3 text-sm text-muted">Sesión: {email}</li>}
           </ul>
         </nav>
       )}

@@ -4,7 +4,9 @@ import type { GoalId, Recommendation } from "./data/content";
 import { destinationsFrom, findTrip, places } from "./data/rojo";
 import { recommend } from "./lib/engine";
 import { getAir, getNextBusMinutes, getWeather, type Air, type Weather } from "./lib/live";
-import { loadSavings, storeSavings, type SavedTrip } from "./lib/savings";
+import { addRemote, clearRemote, loadLocal, loadRemote, storeLocal, type SavedTrip } from "./lib/savings";
+import { supabase } from "./lib/supabase";
+import { LoginPanel } from "./components/LoginPanel";
 import { Header } from "./components/Header";
 import { DailyRecommendation } from "./components/DailyRecommendation";
 import { CorridorStatus } from "./components/CorridorStatus";
@@ -39,7 +41,10 @@ export default function App() {
   const [liveLoading, setLiveLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Recommendation | null>(null);
-  const [saved, setSaved] = useState<SavedTrip[]>(loadSavings);
+  const [saved, setSaved] = useState<SavedTrip[]>(loadLocal);
+  const [email, setEmail] = useState<string | null>(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const destinations = useMemo(() => destinationsFrom(from), [from]);
@@ -57,7 +62,28 @@ export default function App() {
     });
   }, []);
 
-  useEffect(() => { storeSavings(saved); }, [saved]);
+  // Sesión: al entrar, sube los ahorros locales y carga los de la cuenta.
+  useEffect(() => {
+    const onSession = async (userEmail: string | null) => {
+      setEmail(userEmail);
+      if (!userEmail) { setSaved(loadLocal()); return; }
+      try {
+        const local = loadLocal();
+        if (local.length) { await addRemote(local); storeLocal([]); }
+        setSaved(await loadRemote());
+        setSyncError(null);
+      } catch {
+        setSyncError("No se pudieron cargar tus ahorros de la nube. Se muestran los de este dispositivo.");
+      }
+    };
+    supabase.auth.getSession().then(({ data }) => onSession(data.session?.user.email ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") onSession(session?.user.email ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => { if (!email) storeLocal(saved); }, [saved, email]);
 
   const changeFrom = (v: string) => {
     setFrom(v);
@@ -75,28 +101,40 @@ export default function App() {
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
-  const isSaved = !!result && saved.some((t) => t.id === result.createdAt);
+  const isSaved = !!result && saved.some((t) => t.date === result.createdAt);
 
-  const save = () => {
+  const save = async () => {
     if (!result || isSaved) return;
     const rec = result.options.find((o) => o.id === result.recommended)!;
-    setSaved((list) => [
-      {
-        id: result.createdAt,
-        date: result.createdAt,
-        from: result.route.from,
-        to: result.route.to,
-        mode: result.recommended,
-        amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
-        kcal: rec.kcal,
-      },
-      ...list,
-    ]);
+    const trip: SavedTrip = {
+      id: result.createdAt,
+      date: result.createdAt,
+      from: result.route.from,
+      to: result.route.to,
+      mode: result.recommended,
+      amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
+      kcal: rec.kcal,
+    };
+    if (!email) { setSaved((list) => [trip, ...list]); return; }
+    try {
+      const [stored] = await addRemote([trip]);
+      setSaved((list) => [stored, ...list]);
+      setSyncError(null);
+    } catch {
+      setSyncError("No se pudo guardar en la nube. Intenta de nuevo.");
+    }
+  };
+
+  const clearAll = async () => {
+    if (email) {
+      try { await clearRemote(); } catch { setSyncError("No se pudo borrar el historial."); return; }
+    }
+    setSaved([]);
   };
 
   return (
     <div className="min-h-screen bg-bg">
-      <Header />
+      <Header email={email} onLogin={() => setLoginOpen(true)} onLogout={() => supabase.auth.signOut()} />
 
       <main className="mx-auto max-w-6xl space-y-10 px-4 py-8 sm:px-6 sm:py-12">
         <DailyRecommendation
@@ -126,11 +164,12 @@ export default function App() {
           </div>
         )}
 
-        <MySavings list={saved} onClear={() => setSaved([])} />
+        <MySavings list={saved} onClear={clearAll} loggedIn={!!email} onLogin={() => setLoginOpen(true)} error={syncError} />
       </main>
 
       <Footer />
       <HelpButton />
+      {loginOpen && <LoginPanel onClose={() => setLoginOpen(false)} />}
       {brand.showThemeSwitcher && <ThemeSwitcher value={theme} onChange={setTheme} />}
     </div>
   );

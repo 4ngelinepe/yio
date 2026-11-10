@@ -2,10 +2,11 @@
  * Datos en vivo.
  * - Clima y aire: Open-Meteo (gratis, sin llave, uso no comercial).
  * - Llegadas del Corredor Rojo: el API no permite llamadas desde otros sitios (CORS),
- *   así que pasa por un intermediario. Configurar VITE_ARRIVALS_URL cuando exista
- *   (ej. una Edge Function de Supabase). Sin eso, GEO usa frecuencias estimadas.
+ *   así que pasa por un intermediario: la Edge Function supabase/functions/rojo-arrivals.
+ *   Si no responde, GEO usa frecuencias estimadas.
  */
 import type { IconName } from "../data/content";
+import { ARRIVALS_URL } from "./supabase";
 
 export type Weather = { temp: number; code: number; label: string; icon: IconName; rainy: boolean };
 export type Air = { usAqi: number; pm25: number };
@@ -56,13 +57,10 @@ export async function getAir(lat: number, lng: number): Promise<Air | null> {
   }
 }
 
-const ARRIVALS_URL = import.meta.env.VITE_ARRIVALS_URL as string | undefined;
-
 /** Minutos hasta el próximo bus de esa ruta en ese paradero, o null si no hay dato en vivo. */
 export async function getNextBusMinutes(stopId: string, routeCode: string): Promise<number | null> {
-  if (!ARRIVALS_URL) return null;
   try {
-    const list = (await getJson(`${ARRIVALS_URL}?stopId=${encodeURIComponent(stopId)}`)) as {
+    const list = (await getJson(`${ARRIVALS_URL}?stopId=${encodeURIComponent(stopId)}`, 5000)) as {
       lineName: string;
       estimatedTime: number;
     }[];

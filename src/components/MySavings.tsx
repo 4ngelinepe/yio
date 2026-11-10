@@ -7,7 +7,9 @@ import { Card, StatTile } from "./ui/primitives";
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString("es-PE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-export function MySavings({ list, onClear }: { list: SavedTrip[]; onClear: () => void }) {
+export function MySavings({ list, onClear, loggedIn, onLogin, error }: {
+  list: SavedTrip[]; onClear: () => void; loggedIn: boolean; onLogin: () => void; error: string | null;
+}) {
   const [confirming, setConfirming] = useState(false);
   const m = monthSummary(list);
 
@@ -43,7 +45,7 @@ export function MySavings({ list, onClear }: { list: SavedTrip[]; onClear: () =>
           <div className="mt-4 flex items-center gap-3 text-sm">
             {confirming ? (
               <>
-                <span className="text-muted">¿Borrar todo el historial de este dispositivo?</span>
+                <span className="text-muted">¿Borrar todo el historial?</span>
                 <button type="button" className="text-danger-text underline" onClick={() => { onClear(); setConfirming(false); }}>Sí, borrar</button>
                 <button type="button" className="text-muted underline" onClick={() => setConfirming(false)}>Cancelar</button>
               </>
@@ -55,7 +57,16 @@ export function MySavings({ list, onClear }: { list: SavedTrip[]; onClear: () =>
           </div>
         </>
       )}
-      <p className="mt-4 text-xs text-subtle">Por ahora se guarda solo en este dispositivo. Con tu cuenta se sincronizará.</p>
+      {error && <p role="alert" className="mt-4 text-sm text-danger-text">{error}</p>}
+      {loggedIn ? (
+        <p className="mt-4 text-xs text-subtle">Guardado en tu cuenta: lo ves desde cualquier dispositivo.</p>
+      ) : (
+        <p className="mt-4 text-xs text-subtle">
+          Se guarda solo en este dispositivo.{" "}
+          <button type="button" onClick={onLogin} className="text-primary underline">Entra con tu correo</button>{" "}
+          para no perderlo.
+        </p>
+      )}
     </Card>
   );
 }
