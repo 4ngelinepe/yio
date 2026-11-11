@@ -8,6 +8,8 @@ import { Icon } from "./ui/Icon";
 import { Button, Card } from "./ui/primitives";
 
 type Props = {
+  clock: string;
+  dark: boolean;
   networks: Network[];
   networkId: NetworkId;
   onNetwork: (id: NetworkId) => void;
@@ -71,8 +73,10 @@ export function DailyRecommendation(p: Props) {
 
   return (
     <Card className="p-6 sm:p-10" labelledBy="goal-title">
-      {/* Clima y aire en vivo, en una línea */}
+      {/* Hora, clima y aire en vivo, en una línea */}
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+        <span className="font-medium tabular-nums text-ink">{p.clock}</span>
+        <span>·</span>
         {p.liveLoading
           ? <Loader2 className="size-4 animate-spin text-energy" />
           : <Icon name={p.weather?.icon ?? "cloud"} className="size-5 text-energy" />}
@@ -86,6 +90,22 @@ export function DailyRecommendation(p: Props) {
           <span>· {p.liveLoading ? "cargando clima…" : "sin datos de clima ahora"}</span>
         )}
       </p>
+      {/* Pronóstico de las próximas horas */}
+      {p.weather && p.weather.next.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted" aria-label="Pronóstico de las próximas horas">
+          {p.weather.next.map((h) => (
+            <span key={h.hour} className="inline-flex items-center gap-1" title={h.label}>
+              <span className="tabular-nums">{h.hour}</span>
+              <Icon name={h.icon} className="size-4 text-energy" />
+              <span className="tabular-nums text-ink">{h.temp}°</span>
+              {h.rainProb >= 30 && <span className="text-info-text">{h.rainProb}%</span>}
+            </span>
+          ))}
+          <span className="text-subtle">
+            {p.weather.rainSoon ? "· Posible lluvia pronto" : p.dark ? `· Amanece ${p.weather.sunrise}` : `· Atardece ${p.weather.sunset}`}
+          </span>
+        </div>
+      )}
 
       {/* Tramo */}
       <div className="mt-5">

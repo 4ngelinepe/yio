@@ -32,6 +32,14 @@ export function RouteSummary({ data, save, onSave }: {
         {data.today.map((s) => <StatTile key={s.label} {...s} />)}
       </div>
 
+      <details className="mt-3 text-sm text-muted">
+        <summary className="cursor-pointer select-none text-primary">¿Cómo calculamos tu ahorro?</summary>
+        <ul className="mt-2 space-y-1 pl-4">
+          {data.savingsHow.map((t) => <li key={t} className="list-disc">{t}</li>)}
+        </ul>
+        <p className="mt-2 text-xs">Taxi: tarifa referencial de app en Lima según la distancia. No incluye tarifa dinámica.</p>
+      </details>
+
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
         <Button
           variant="secondary"

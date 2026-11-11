@@ -59,3 +59,62 @@
   --radius-lg: 24px;
   --shadow: 0 10px 30px -12px rgb(15 23 42 / 0.15);
 }
+
+/* Modo noche: se activa solo después del atardecer en Lima (data-mode="dark"). */
+[data-theme="geo"][data-mode="dark"] {
+  color-scheme: dark;
+
+  --bg: #0b1220;
+  --surface: #111a2e;
+  --surface-muted: #16213a;
+  --border: #24314d;
+  --text: #e5e9f2;
+  --text-muted: #a3adc2;
+  --text-subtle: #6b7690;
+
+  --primary: #5b8def;
+  --primary-fg: #ffffff;
+  --primary-soft: #16264a;
+  --primary-text: #bcd0fb;
+
+  --info: #5b8def;
+  --info-soft: #14233f;
+  --info-border: #2b4475;
+  --info-text: #a9c2f7;
+
+  --success: #3da64b;
+  --success-soft: #11291a;
+  --success-border: #255c33;
+  --success-text: #8fdc9e;
+
+  --warning: #f08a3c;
+  --warning-soft: #2d1d10;
+  --warning-border: #6b3a17;
+  --warning-text: #f8b98a;
+
+  --danger: #ef5350;
+  --danger-soft: #2f1416;
+  --danger-border: #6e2a2c;
+  --danger-text: #f6a5a3;
+
+  --highlight: #a66ef0;
+  --highlight-soft: #241a38;
+  --highlight-border: #4a3373;
+  --highlight-text: #d4b8fa;
+
+  --energy: #f08a3c;
+  --energy-soft: #2d1d10;
+  --energy-border: #6b3a17;
+  --energy-text: #f8b98a;
+
+  --neutral: #6b7690;
+  --neutral-soft: #16213a;
+  --neutral-border: #24314d;
+  --neutral-text: #c5ccdb;
+
+  --shadow: 0 10px 30px -12px rgb(0 0 0 / 0.6);
+}
+
+/* Mapa en modo noche: oscurece las calles sin tocar los marcadores. */
+[data-mode="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
+[data-mode="dark"] .leaflet-container { background: #0b1220; }

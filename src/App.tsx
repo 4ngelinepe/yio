@@ -74,6 +74,21 @@ export default function App() {
     try { localStorage.setItem("theme", theme); } catch { /* noop */ }
   }, [theme]);
 
+  // Reloj (hora de Lima) que se actualiza cada 30 s.
+  const [clock, setClock] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setClock(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+  const limaHM = clock.toLocaleTimeString("es-PE", { timeZone: "America/Lima", hour: "2-digit", minute: "2-digit", hour12: false });
+
+  // Claro de día, oscuro de noche, según el amanecer y el atardecer de Lima.
+  const dark = limaHM < (weather?.sunrise ?? "05:45") || limaHM >= (weather?.sunset ?? "18:15");
+  useEffect(() => {
+    document.documentElement.dataset.mode = dark ? "dark" : "light";
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0b1220" : "#2563eb");
+  }, [dark]);
+
   useEffect(() => {
     Promise.all([getWeather(LIMA.lat, LIMA.lng), getAir(LIMA.lat, LIMA.lng)]).then(([w, a]) => {
       setWeather(w);
@@ -243,6 +258,8 @@ export default function App() {
       )}
       <main className="mx-auto max-w-6xl space-y-8 px-4 pb-10 pt-4 sm:px-6 sm:pt-6">
         <DailyRecommendation
+          clock={limaHM}
+          dark={dark}
           weather={weather}
           air={air}
           liveLoading={liveLoading}

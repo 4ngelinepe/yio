@@ -58,6 +58,7 @@ function airStatus(air: Air | null, weather: Weather | null): { level: StatusLev
     parts.push("Sin dato de aire ahora");
   }
   if (weather?.rainy) { level = Math.max(level, 2) as StatusLevel; parts.push(weather.label.toLowerCase()); }
+  else if (weather?.rainSoon) { level = Math.max(level, 2) as StatusLevel; parts.push("posible lluvia en las próximas horas"); }
   if (weather && weather.temp >= 30) { level = Math.max(level, 2) as StatusLevel; parts.push(`${weather.temp} °C`); }
   return { level, reason: parts.join(" · ") };
 }
@@ -143,8 +144,8 @@ export function recommend(input: EngineInput): Recommendation | null {
   // Decisión
   const status = airStatus(input.air, input.weather);
   const walkOk = status.level < 3 && mid(walk.minutes) <= 60;
-  const bikeOk = input.hasBike && status.level < 3 && !input.weather?.rainy && mid(bike.minutes) <= 60;
-  const scooterOk = input.hasScooter && status.level < 3 && !input.weather?.rainy && mid(scooter.minutes) <= 60;
+  const bikeOk = input.hasBike && status.level < 3 && !input.weather?.rainy && !input.weather?.rainSoon && mid(bike.minutes) <= 60;
+  const scooterOk = input.hasScooter && status.level < 3 && !input.weather?.rainy && !input.weather?.rainSoon && mid(scooter.minutes) <= 60;
   const sm = mid(scooter.minutes);
   const fastest = [walkOk ? walk : null, bikeOk ? bike : null, scooterOk ? scooter : null, bus]
     .filter((o): o is ModeOption => !!o)
@@ -197,6 +198,20 @@ export function recommend(input: EngineInput): Recommendation | null {
     active ? [fare, taxi.cost[1]]
     : [Math.max(0, taxi.cost[0] - fare), Math.max(0, taxi.cost[1] - fare)];
 
+  // Cómo se llega al ahorro de hoy, en palabras.
+  const modeName = { walk: "caminando", bike: "en bici", scooter: "en scooter", bus: "" }[recommended];
+  const savingsHow: string[] = active
+    ? [
+        `Vas ${modeName}: tu viaje cuesta S/ 0.`,
+        fare > 0 ? `Frente a ${busName}: ahorras el pasaje, ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis, así que frente a él no hay diferencia.`,
+        `Frente a un taxi (${solesRange(taxi.cost)} por ${taxiKm.toFixed(1)} km): ahorras hasta ${soles(taxi.cost[1])}.`,
+      ]
+    : [
+        `Un taxi por este tramo (${taxiKm.toFixed(1)} km) cuesta ${solesRange(taxi.cost)}.`,
+        fare > 0 ? `En ${busName} pagas ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis.`,
+        `Diferencia: ${solesRange(savings)}.`,
+      ];
+
   const monthly: Range = [savings[0] * 20, savings[1] * 20];
   const walkKm = walkM / 1000;
 
@@ -211,6 +226,7 @@ export function recommend(input: EngineInput): Recommendation | null {
     recommended,
     why,
     savings,
+    savingsHow,
     today: [
       { label: { walk: "Duración caminando", bike: "Duración en bici", scooter: "Duración en scooter", bus: "Duración del viaje" }[recommended], value: minRange(rec.minutes), icon: "clock", tone: "info" },
       { label: "Ahorro hoy", value: solesRange(savings), icon: "dollar", tone: "success" },

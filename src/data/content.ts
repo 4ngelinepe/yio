@@ -47,6 +47,7 @@ export type Recommendation = {
   recommended: ModeId;
   why: string;
   savings: Range; // soles ahorrados por viaje frente a la alternativa más cara razonable
+  savingsHow: string[]; // cómo se calcula el ahorro, en frases cortas
   today: Stat[];
   impact: { intro: string; stats: Stat[]; equivalences: string[] };
   quote: string;
