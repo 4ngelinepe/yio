@@ -85,7 +85,17 @@ export default function App() {
   const limaHM = clock.toLocaleTimeString("es-PE", { timeZone: "America/Lima", hour: "2-digit", minute: "2-digit", hour12: false });
 
   // Claro de día, oscuro de noche, según el amanecer y el atardecer de Lima.
-  const dark = limaHM < (weather?.sunrise ?? "05:45") || limaHM >= (weather?.sunset ?? "18:15");
+  const autoDark = limaHM < (weather?.sunrise ?? "05:45") || limaHM >= (weather?.sunset ?? "18:15");
+  // El farol: "auto" sigue la puesta de sol; al tocarlo se fuerza el modo contrario; otro toque vuelve a auto.
+  const [modePref, setModePref] = useState<"auto" | "light" | "dark">(() => {
+    try { const v = localStorage.getItem("yio.mode"); return v === "light" || v === "dark" ? v : "auto"; } catch { return "auto"; }
+  });
+  const dark = modePref === "auto" ? autoDark : modePref === "dark";
+  const toggleMode = () => {
+    const next = modePref === "auto" ? (autoDark ? "light" : "dark") : "auto";
+    setModePref(next);
+    try { if (next === "auto") localStorage.removeItem("yio.mode"); else localStorage.setItem("yio.mode", next); } catch { /* noop */ }
+  };
   useEffect(() => {
     document.documentElement.dataset.mode = dark ? "dark" : "light";
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#0b1220" : "#2563eb");
@@ -265,7 +275,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg">
-      <Header email={email} onLogin={() => setLoginOpen(true)} onLogout={() => supabase.auth.signOut()} />
+      <Header email={email} onLogin={() => setLoginOpen(true)} onLogout={() => supabase.auth.signOut()}
+        dark={dark} modeAuto={modePref === "auto"} onToggleMode={toggleMode} />
 
       {!online && (
         <p role="status" className="bg-warning-soft px-4 py-2 text-center text-sm text-warning-text">

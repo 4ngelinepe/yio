@@ -17,6 +17,7 @@ export function Footer() {
         <p className="mt-4 text-sm text-subtle">
           © {brand.year} {brand.productName} · {brand.siteName}
         </p>
+        <p className="mt-1 text-xs text-subtle">Iconografía limeña por Alfabeto Visual</p>
       </div>
     </footer>
   );

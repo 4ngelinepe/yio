@@ -2,12 +2,16 @@ import { useState } from "react";
 import { LogIn, Menu, X } from "lucide-react";
 import { brand } from "../config/brand";
 import { menuLinks } from "../data/content";
+import { Farol } from "./ui/LimaIcons";
 
-type Props = { email: string | null; onLogin: () => void; onLogout: () => void };
+type Props = {
+  email: string | null; onLogin: () => void; onLogout: () => void;
+  dark: boolean; modeAuto: boolean; onToggleMode: () => void;
+};
 
 const nameFrom = (email: string) => email.split("@")[0];
 
-export function Header({ email, onLogin, onLogout }: Props) {
+export function Header({ email, onLogin, onLogout, dark, modeAuto, onToggleMode }: Props) {
   const [open, setOpen] = useState(false);
 
   const account = email ? (
@@ -39,6 +43,17 @@ export function Header({ email, onLogin, onLogout }: Props) {
 
         <div className="flex min-w-0 items-center gap-2 text-sm text-muted">
           <div className="flex min-w-0 items-center gap-3">{account}</div>
+          <button
+            type="button"
+            onClick={onToggleMode}
+            aria-pressed={dark}
+            aria-label={`${dark ? "Modo noche" : "Modo día"}${modeAuto ? " (automático según la puesta de sol)" : ""}. Cambiar`}
+            title={modeAuto ? "Día y noche automáticos según la puesta de sol en Lima" : "Modo elegido a mano · toca para volver al automático"}
+            className="relative grid size-10 shrink-0 place-items-center rounded-control text-primary hover:bg-surface-muted"
+          >
+            <Farol lit={dark} className="size-6" />
+            {!modeAuto && <span className="absolute right-1.5 top-1.5 size-1.5 rounded-full bg-primary" aria-hidden />}
+          </button>
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}

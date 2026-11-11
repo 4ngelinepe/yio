@@ -1,3 +1,4 @@
+import { PortadaArco } from "./ui/LimaIcons";
 import { ArrowRight, Bookmark, BookmarkCheck, Loader2, Map } from "lucide-react";
 import type { Recommendation } from "../data/content";
 import { Button, Card, StatTile } from "./ui/primitives";
@@ -62,7 +63,8 @@ export function RouteSummary({ data, save, onSave }: {
         </Button>
         <p aria-live="polite" className="text-sm">
           {saved && (
-            <span className="text-success-text">
+            <span className="inline-flex items-center gap-2 text-success-text">
+              <PortadaArco className="size-5 shrink-0" />
               Listo, {save.cloud ? "quedó en tu cuenta" : "quedó en este dispositivo"}.{" "}
               <a href="#mis-ahorros" className="underline">Ver Mis ahorros</a>
             </span>

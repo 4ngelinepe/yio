@@ -1,3 +1,4 @@
+import { BalconCajon } from "./ui/LimaIcons";
 import { useState } from "react";
 import { ArrowLeftRight, ArrowRight, CloudOff, Loader2, Trash2, Wallet, X } from "lucide-react";
 import { soles } from "../lib/engine";
@@ -92,9 +93,12 @@ export function MySavings(p: Props) {
       <h2 id="savings-title" className="text-xl text-ink">Mis ahorros</h2>
 
       {p.list.length === 0 ? (
-        <p className="mt-3 text-muted">
-          Todavía no guardas ningún ahorro. Calcula un tramo y toca <strong>Guardar mi ahorro</strong>.
-        </p>
+        <div className="mt-6 flex flex-col items-center gap-3 rounded-tile border border-dashed border-line px-6 py-10 text-center">
+          <BalconCajon className="size-12 text-primary" />
+          <p className="max-w-sm text-muted">
+            Todavía no guardas ningún ahorro. Calcula un tramo y toca <strong>Guardar mi ahorro</strong>: aquí verás lo que le ganas a la ciudad.
+          </p>
+        </div>
       ) : (
         <>
           <p className="mt-1 text-sm text-muted">Este mes</p>
