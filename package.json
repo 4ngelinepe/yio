@@ -1,5 +1,5 @@
 {
-  "name": "geo-wireframe-mvp",
+  "name": "yio",
   "version": "0.1.0",
   "description": "MVP en wireframe de GEO: recomendador de corredores para caminar. Marca enchufable vía tokens.",
   "scripts": {
