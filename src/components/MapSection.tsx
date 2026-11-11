@@ -3,7 +3,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { ArrowRight, Bike, Loader2 } from "lucide-react";
 import type { Recommendation } from "../data/content";
-import { BIKE_SOURCE, getBikeData, type BBox } from "../lib/bikes";
+import { BIKE_SOURCE, getBikeData, type BBox, type BikeCoverage } from "../lib/bikes";
+import { coverageText } from "./DirectComparison";
 import { cx } from "../lib/tones";
 import { Card } from "./ui/primitives";
 
@@ -12,8 +13,9 @@ const cssVar = (name: string) =>
 
 type BikeState = "off" | "loading" | "on" | "error";
 
-export function MapSection({ route, path, theme, autoBikes = false }: {
+export function MapSection({ route, path, theme, autoBikes = false, bikePath, bikeCov }: {
   route: Recommendation["route"]; path: Recommendation["path"]; theme: string;
+  bikePath?: [number, number][]; bikeCov?: BikeCoverage | null;
   /** Muestra las ciclovías de entrada (cuando el usuario tiene bici/scooter o se recomienda). */
   autoBikes?: boolean;
 }) {
@@ -45,10 +47,13 @@ export function MapSection({ route, path, theme, autoBikes = false }: {
     end(path[0], cssVar("--success"));
     end(path[path.length - 1], cssVar("--danger"));
 
-    map.fitBounds(L.latLngBounds(pts), { padding: [40, 40] });
+    // Ruta real en bici (verde), si van en bici o scooter
+    const showBike = autoBikes && bikePath && bikePath.length > 1;
+    if (showBike) L.polyline(bikePath!, { color: cssVar("--success"), weight: 4, opacity: 0.95 }).bindTooltip("Ruta en bici").addTo(map);
+    map.fitBounds(L.latLngBounds(showBike ? [...pts, ...bikePath!] : pts), { padding: [40, 40] });
     setBikes("off");
     return () => { map.remove(); mapRef.current = null; bikeLayer.current = null; };
-  }, [path, theme]);
+  }, [path, theme, bikePath, autoBikes]);
 
   const toggleBikes = async () => {
     if (bikes === "on") {
@@ -125,6 +130,12 @@ export function MapSection({ route, path, theme, autoBikes = false }: {
         <span className="flex items-center gap-2 text-muted"><ArrowRight className="size-4" />{route.via}</span>
         <span className="flex items-center gap-2"><ArrowRight className="size-4 text-muted" /><span className="size-2.5 rounded-full bg-danger" />{route.to}</span>
       </div>
+      {autoBikes && bikeCov && (
+        <p className="border-t border-line bg-success-soft px-6 py-3 text-sm text-success-text sm:px-10">
+          <strong className="font-medium">Ruta en bici (verde):</strong> {coverageText(bikeCov)}
+          {bikeCov.pct > 0 && bikeCov.segregatedPct < bikeCov.pct && ` · ${bikeCov.segregatedPct}% separada del tráfico`}.
+        </p>
+      )}
       {bikes === "on" && (
         <p className="border-t border-line px-6 py-3 text-xs text-muted sm:px-10">
           {bikeCount.lanes} tramos de ciclovía y {bikeCount.parking} cicloparqueaderos cerca. Línea continua: ciclovía; punteada: cicloacera, ciclocarril o carril compartido. {BIKE_SOURCE}.

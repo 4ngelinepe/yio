@@ -3,6 +3,7 @@ import { brand, themes, type ThemeName } from "./config/brand";
 import type { GoalId, Recommendation } from "./data/content";
 import { NETWORKS, destinationGroups, findTrip, nearestPlace, networkById, placeGroups, type NetworkId } from "./data/networks";
 import { recommend } from "./lib/engine";
+import { bikeCoverage, getBikeData, type BikeCoverage } from "./lib/bikes";
 import { getAir, getBusEta, getStreetTimes, getWeather, type Air, type Weather } from "./lib/live";
 import { addRemote, clearRemote, deleteRemote, loadLocal, loadPending, loadRemote, storeLocal, storePending, type SavedTrip } from "./lib/savings";
 import { supabase } from "./lib/supabase";
@@ -43,6 +44,7 @@ export default function App() {
   const [hasScooter, setHasScooter] = useState<boolean>(() => { try { return localStorage.getItem("yio.hasScooter") === "1"; } catch { return false; } });
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
   const [weather, setWeather] = useState<Weather | null>(null);
+  const [bikeCov, setBikeCov] = useState<BikeCoverage | null>(null);
   const [air, setAir] = useState<Air | null>(null);
   const [liveLoading, setLiveLoading] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -178,7 +180,16 @@ export default function App() {
       : [null, null];
     const r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, streets, hasBike, hasScooter });
     setResult(r);
+    setBikeCov(null);
     setSaveState({ kind: "idle" });
+    // Ciclovías en la ruta en bici (en segundo plano, no frena la recomendación)
+    const bp = r?.bikePath;
+    if (r && bp && bp.length > 1 && (hasBike || hasScooter || r.recommended === "bike" || r.recommended === "scooter")) {
+      const lats = bp.map((p) => p[0]), lngs = bp.map((p) => p[1]), pad = 0.002;
+      getBikeData([Math.min(...lngs) - pad, Math.min(...lats) - pad, Math.max(...lngs) + pad, Math.max(...lats) + pad])
+        .then(({ lanes }) => setBikeCov(bikeCoverage(bp, lanes)))
+        .catch(() => setBikeCov(null));
+    }
     setLoading(false);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
@@ -292,9 +303,9 @@ export default function App() {
           <div ref={resultsRef} className="scroll-mt-24 space-y-10">
             <CorridorStatus data={result} />
             <RouteSummary data={result} save={saveState} onSave={save} />
-            <MapSection route={result.route} path={result.path} theme={theme}
+            <MapSection route={result.route} path={result.path} theme={theme} bikePath={result.bikePath} bikeCov={bikeCov}
               autoBikes={hasBike || hasScooter || result.recommended === "bike" || result.recommended === "scooter"} />
-            <DirectComparison data={result} />
+            <DirectComparison data={result} bikeCov={bikeCov} />
             <CumulativeImpact data={result.impact} />
           </div>
         )}

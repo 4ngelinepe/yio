@@ -336,6 +336,7 @@ export function recommend(input: EngineInput): Recommendation | null {
     },
     quote: quotes[input.goal][input.now.getDate() % quotes[input.goal].length],
     goal: input.goal,
+    bikePath: input.streets?.bike?.path,
     conditions: {
       air: input.air ? aqiLabel(input.air.usAqi) : undefined,
       uv: input.weather ? {

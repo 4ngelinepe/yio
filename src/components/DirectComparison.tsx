@@ -2,10 +2,16 @@ import { BadgeCheck, Check } from "lucide-react";
 import type { ModeOption, Recommendation } from "../data/content";
 import { minRange, solesRange } from "../lib/engine";
 import { cx } from "../lib/tones";
+import type { BikeCoverage } from "../lib/bikes";
 import { Icon } from "./ui/Icon";
 import { Card, IconTile } from "./ui/primitives";
 
-function Option({ o, recommended }: { o: ModeOption; recommended: boolean }) {
+export const coverageText = (c: BikeCoverage) =>
+  c.pct === 0 ? "Esta ruta no pasa por ciclovías"
+  : `${c.pct}% por ciclovía${c.names.length ? ` (${c.names.join(", ")})` : ""}`;
+
+function Option({ o, recommended, extra }: { o: ModeOption; recommended: boolean; extra?: string }) {
+  const perks = extra ? [extra, ...(o.perks ?? [])] : o.perks;
   const rows = [
     { label: "Duración", value: minRange(o.minutes), icon: "clock" as const },
     { label: "Costo", value: o.cost[1] === 0 ? "S/ 0.00" : solesRange(o.cost), icon: "dollar" as const },
@@ -31,9 +37,9 @@ function Option({ o, recommended }: { o: ModeOption; recommended: boolean }) {
           <p className={recommended ? "text-success-text opacity-80" : "text-muted"}>{o.subtitle}</p>
         </div>
       </header>
-      {o.perks && o.perks.length > 0 && (
+      {perks && perks.length > 0 && (
         <ul className="mt-4 space-y-1.5 text-sm">
-          {o.perks.map((t) => (
+          {perks.map((t) => (
             <li key={t} className={cx("flex gap-2", recommended ? "text-success-text" : "text-ink")}>
               <Check className={cx("mt-0.5 size-4 shrink-0", recommended ? "text-success" : "text-primary")} aria-hidden />
               {t}
@@ -57,13 +63,16 @@ function Option({ o, recommended }: { o: ModeOption; recommended: boolean }) {
   );
 }
 
-export function DirectComparison({ data }: { data: Recommendation }) {
+export function DirectComparison({ data, bikeCov }: { data: Recommendation; bikeCov?: BikeCoverage | null }) {
   const ordered = [...data.options].sort((a, b) => (a.id === data.recommended ? -1 : b.id === data.recommended ? 1 : 0));
   return (
     <Card className="p-6 sm:p-10" labelledBy="compare-title">
       <h2 id="compare-title" className="text-xl text-ink">Comparación directa</h2>
       <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-5 xl:grid-cols-5 xl:gap-4">
-        {ordered.map((o) => <Option key={o.id} o={o} recommended={o.id === data.recommended} />)}
+        {ordered.map((o) => (
+          <Option key={o.id} o={o} recommended={o.id === data.recommended}
+            extra={bikeCov && (o.id === "bike" || o.id === "scooter") ? coverageText(bikeCov) : undefined} />
+        ))}
       </div>
       <p className="mt-6 text-sm text-subtle">
         Tiempos y costos estimados. Pasaje según la tarifa de cada corredor; tarifa de taxi referencial.

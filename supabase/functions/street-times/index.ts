@@ -6,7 +6,8 @@
 //   2. Guardar la clave en Edge Functions → Secrets con el nombre ORS_KEY (nunca en el código ni en la app).
 //
 // Uso: GET ?from=lat,lng&to=lat,lng
-// Respuesta: { walk: { m, s } | null, bike: { m, s } | null }   (m = metros, s = segundos)
+// Respuesta: { walk: { m, s, path } | null, bike: { m, s, path } | null }
+//   m = metros, s = segundos, path = [[lat, lng], …] simplificado (un punto cada ~25 m).
 // API: api.heigit.org/openrouteservice (la dirección vieja api.openrouteservice.org está deprecada).
 // Plan gratis de ORS: 2.000 rutas/día. Se guarda cada tramo 24 h en memoria para no gastar de más.
 
@@ -21,7 +22,7 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": "public, max-age=86400" },
   });
 
-type Leg = { m: number; s: number } | null;
+type Leg = { m: number; s: number; path: [number, number][] } | null;
 const cache = new Map<string, { t: number; walk: Leg; bike: Leg }>();
 const DAY = 86_400_000;
 
@@ -32,6 +33,23 @@ function parse(v: string | null): [number, number] | null {
   const lat = Number(m[1]), lng = Number(m[2]);
   if (lat < -12.6 || lat > -11.5 || lng < -77.3 || lng > -76.6) return null;
   return [lat, lng];
+}
+
+
+/** [[lng, lat], …] → [[lat, lng], …] con un punto cada ~25 m y 5 decimales (≈1 m). */
+function simplify(coords: [number, number][]): [number, number][] {
+  const out: [number, number][] = [];
+  let last: [number, number] | null = null;
+  for (let i = 0; i < coords.length; i++) {
+    const [lng, lat] = coords[i];
+    const p: [number, number] = [Number(lat.toFixed(5)), Number(lng.toFixed(5))];
+    const isEnd = i === coords.length - 1;
+    if (!last || isEnd || Math.hypot((p[0] - last[0]) * 111_000, (p[1] - last[1]) * 108_000) >= 25) {
+      out.push(p);
+      last = p;
+    }
+  }
+  return out;
 }
 
 async function route(profile: "foot-walking" | "cycling-regular", a: [number, number], b: [number, number], key: string): Promise<Leg> {
@@ -45,9 +63,10 @@ async function route(profile: "foot-walking" | "cycling-regular", a: [number, nu
     });
     if (!r.ok) return null;
     const d = await r.json();
-    const sum = d?.features?.[0]?.properties?.summary;
+    const f = d?.features?.[0];
+    const sum = f?.properties?.summary;
     if (!sum || typeof sum.distance !== "number") return null;
-    return { m: Math.round(sum.distance), s: Math.round(sum.duration) };
+    return { m: Math.round(sum.distance), s: Math.round(sum.duration), path: simplify(f?.geometry?.coordinates ?? []) };
   } catch {
     return null;
   }

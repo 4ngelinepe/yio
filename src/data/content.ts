@@ -54,6 +54,8 @@ export type Recommendation = {
   impact: { intro: string; stats: Stat[]; equivalences: string[] };
   quote: string;
   goal: GoalId;
+  /** Ruta real en bici por calles ([lat, lng]), si hay. */
+  bikePath?: [number, number][];
   /** Condiciones del día traducidas a decisiones. */
   conditions: {
     air?: string;

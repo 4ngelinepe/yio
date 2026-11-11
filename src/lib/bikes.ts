@@ -51,3 +51,87 @@ export async function getBikeData(bbox: BBox) {
   ]);
   return { lanes, parking };
 }
+
+/* ───────── Cuánto de una ruta en bici va por ciclovía ───────── */
+
+export type BikeCoverage = {
+  /** Porcentaje del recorrido a ≤ 20 m de una ciclovía, cicloacera o ciclocarril. */
+  pct: number;
+  km: number;
+  /** Vías con ciclovía que usa la ruta, de la más larga a la más corta. */
+  names: string[];
+  /** Parte del recorrido en ciclovía segregada (no solo pintura). */
+  segregatedPct: number;
+};
+
+type Seg = { a: [number, number]; b: [number, number]; name: string; segregated: boolean };
+
+const M_LAT = 110_574;
+const M_LNG = 108_900; // a la latitud de Lima
+
+/** Distancia en metros de un punto a un segmento (aproximación plana, suficiente a escala de ciudad). */
+function distToSeg(p: [number, number], a: [number, number], b: [number, number]): number {
+  const px = p[1] * M_LNG, py = p[0] * M_LAT;
+  const ax = a[1] * M_LNG, ay = a[0] * M_LAT, bx = b[1] * M_LNG, by = b[0] * M_LAT;
+  const dx = bx - ax, dy = by - ay;
+  const t = dx || dy ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy))) : 0;
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+const cleanName = (props: Record<string, unknown> | null): string => {
+  const v = String(props?.["Vía"] ?? props?.Nombre_de ?? "").replace(/^C[ií]clov[ií]a\s+/i, "").replace(/-+$/, "").trim();
+  return v || "Ciclovía";
+};
+
+/** path en [lat, lng]. Ignora capas de "carril compartido" (no es infraestructura para bici). */
+export function bikeCoverage(path: [number, number][], lanes: Awaited<ReturnType<typeof getBikeData>>["lanes"]): BikeCoverage | null {
+  if (path.length < 2) return null;
+  const segs: Seg[] = [];
+  for (const l of lanes) {
+    if (!l.data || l.id === "Carril_Compartido_2_BM") continue;
+    for (const f of l.data.features) {
+      const g = f.geometry;
+      const lines = g?.type === "LineString" ? [g.coordinates] : g?.type === "MultiLineString" ? g.coordinates : [];
+      const name = cleanName(f.properties as Record<string, unknown>);
+      const segregated = String((f.properties as Record<string, unknown>)?.Tipo ?? "").toLowerCase().startsWith("vía segregada");
+      for (const line of lines)
+        for (let i = 1; i < line.length; i++)
+          segs.push({ a: [line[i - 1][1], line[i - 1][0]], b: [line[i][1], line[i][0]], name, segregated });
+    }
+  }
+  if (!segs.length) return { pct: 0, km: 0, names: [], segregatedPct: 0 };
+
+  let total = 0, on = 0, seg = 0;
+  const byName = new Map<string, number>();
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i];
+    const len = Math.hypot((b[0] - a[0]) * M_LAT, (b[1] - a[1]) * M_LNG);
+    const steps = Math.max(1, Math.round(len / 10)); // muestra cada ~10 m
+    for (let k = 0; k < steps; k++) {
+      const t = (k + 0.5) / steps;
+      const p: [number, number] = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      const piece = len / steps;
+      total += piece;
+      let best: Seg | null = null, bestD = 20;
+      for (const s of segs) {
+        // descarte rápido por caja
+        if (p[0] < Math.min(s.a[0], s.b[0]) - 0.0003 || p[0] > Math.max(s.a[0], s.b[0]) + 0.0003) continue;
+        if (p[1] < Math.min(s.a[1], s.b[1]) - 0.0003 || p[1] > Math.max(s.a[1], s.b[1]) + 0.0003) continue;
+        const d = distToSeg(p, s.a, s.b);
+        if (d <= bestD) { bestD = d; best = s; }
+      }
+      if (best) {
+        on += piece;
+        if (best.segregated) seg += piece;
+        byName.set(best.name, (byName.get(best.name) ?? 0) + piece);
+      }
+    }
+  }
+  const names = [...byName.entries()].filter(([, m]) => m >= 150).sort((x, y) => y[1] - x[1]).map(([n]) => n);
+  return {
+    pct: total ? Math.round((on / total) * 100) : 0,
+    km: Math.round(on / 100) / 10,
+    names: names.slice(0, 3),
+    segregatedPct: total ? Math.round((seg / total) * 100) : 0,
+  };
+}

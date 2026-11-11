@@ -134,7 +134,8 @@ export async function getBusEta(net: Network, trip: Trip): Promise<BusEta> {
 }
 
 /** Tiempos reales por calles (OpenRouteService vía street-times). m = metros, s = segundos. */
-export type StreetTimes = { walk: { m: number; s: number } | null; bike: { m: number; s: number } | null };
+export type StreetLeg = { m: number; s: number; path?: [number, number][] };
+export type StreetTimes = { walk: StreetLeg | null; bike: StreetLeg | null };
 
 export async function getStreetTimes(a: { lat: number; lng: number }, b: { lat: number; lng: number }): Promise<StreetTimes | null> {
   const f = (p: { lat: number; lng: number }) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
