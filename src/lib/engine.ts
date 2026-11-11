@@ -1,10 +1,10 @@
 /**
- * Motor de recomendación de GEO (Fase 1).
+ * Motor de recomendación de YIO (Fase 1).
  *
  * Reglas transparentes, sin magia. Todo número es un rango porque es un estimado.
  * Supuestos (ajustar con datos reales cuando existan):
  *  - Caminar: 4.8 km/h (80 m/min); la calle real es ~20% más larga que la línea recta.
- *  - GEO nunca recomienda taxi: es la referencia para medir el ahorro.
+ *  - YIO nunca recomienda taxi: es la referencia para medir el ahorro.
  *  - Bus Rojo: 11 km/h en hora punta, 17 km/h fuera; espera 3–8 min (punta) o 4–12 min.
  *  - Taxi: 14 km/h en punta, 24 km/h fuera; tarifa de referencia, no oficial.
  *  - Hora punta: lun–vie 7–10 am y 5–8 pm.

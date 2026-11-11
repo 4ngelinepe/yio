@@ -1,5 +1,5 @@
 /**
- * Corredores complementarios de Lima (bus) — alternativa "Bus" en la comparación de GEO.
+ * Corredores complementarios de Lima (bus) — alternativa "Bus" en la comparación de YIO.
  *
  * Fuente: webs oficiales de cada corredor, transcrito el 10 nov 2026.
  *   Azul:   https://corredorazul.pe/servicio/ (301), /servicio-302/, /servicio-303/, /servicio-306/

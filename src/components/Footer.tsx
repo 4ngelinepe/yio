@@ -15,7 +15,7 @@ export function Footer() {
           ))}
         </nav>
         <p className="mt-4 text-sm text-subtle">
-          © {brand.year} {brand.siteName} · {brand.productName}
+          © {brand.year} {brand.productName} · {brand.siteName}
         </p>
       </div>
     </footer>

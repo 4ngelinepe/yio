@@ -55,10 +55,10 @@ export type Recommendation = {
 };
 
 export const quotes: Record<GoalId, string[]> = {
-  rapido: ["Llegar rápido también es saber cuándo no subirse.", "A veces el atajo es caminar."],
-  ahorro: ["Cada tramo caminado es plata que se queda contigo.", "El pasaje que no pagas también cuenta."],
-  trafico: ["El tráfico no se negocia. Se esquiva.", "Javier Prado no te va a esperar. Tú tampoco a él."],
-  bienestar: ["Caminar este corredor no solo ahorra. También ordena tu cabeza.", "Veinte minutos caminando también son veinte minutos para ti."],
+  rapido: ["Llegar bien también es dejar la pista más libre para todos.", "Cada decisión de viaje mueve a toda la ciudad."],
+  ahorro: ["Lo que ahorras tú, también lo respira Lima.", "Un pasaje menos es un auto menos en la pista."],
+  trafico: ["Un auto menos es una calle mejor para todos.", "El tráfico lo hacemos entre todos. La salida también."],
+  bienestar: ["Cuando caminas, te haces bien y le haces bien a la ciudad.", "Tu bienestar y el de Lima van por la misma vereda."],
 };
 
 export const menuLinks = [

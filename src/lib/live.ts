@@ -3,7 +3,7 @@
  * - Clima y aire: Open-Meteo (gratis, sin llave, uso no comercial).
  * - Llegadas del Corredor Rojo: el API no permite llamadas desde otros sitios (CORS),
  *   así que pasa por un intermediario: la Edge Function supabase/functions/rojo-arrivals.
- *   Si no responde, GEO usa frecuencias estimadas.
+ *   Si no responde, YIO usa frecuencias estimadas.
  */
 import type { IconName } from "../data/content";
 import { ARRIVALS_URL } from "./supabase";

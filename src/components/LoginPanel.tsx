@@ -35,7 +35,7 @@ export function LoginPanel({ onClose }: { onClose: () => void }) {
     <div role="dialog" aria-modal="true" aria-labelledby="login-title" className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-card border border-line bg-surface p-6 shadow-card sm:p-8">
         <div className="flex items-start justify-between gap-4">
-          <h2 id="login-title" className="text-xl text-ink">Entra a GEO</h2>
+          <h2 id="login-title" className="text-xl text-ink">Entra a YIO</h2>
           <button type="button" onClick={onClose} aria-label="Cerrar" className="grid size-9 place-items-center rounded-control text-muted hover:bg-surface-muted">
             <X className="size-5" />
           </button>
