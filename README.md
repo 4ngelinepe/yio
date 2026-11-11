@@ -2,9 +2,9 @@
 
 **Por el bienestar común.** ¿Camino o tomo el bus? YIO compara caminar, el Corredor Rojo y el taxi para tu tramo, con el clima y el aire de ahora, y te dice qué conviene según lo que buscas hoy: moverte rápido, ahorrar, evitar tráfico o sentirte mejor.
 
-**Demo en vivo:** https://4ngelinepe.github.io/geo-wireframe-mvp/
+**Demo en vivo:** https://4ngelinepe.github.io/yio-wireframe-mvp/
 
-Fase 1: uso personal y con amigos, solo Corredor Rojo. (El repo conserva el nombre `geo-wireframe-mvp` del proyecto original.)
+Fase 1: uso personal y con amigos, solo Corredor Rojo. (Antes `geo-wireframe-mvp`.)
 
 ## Qué hace hoy
 
