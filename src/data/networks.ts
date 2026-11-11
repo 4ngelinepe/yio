@@ -339,3 +339,38 @@ export function freeNetwork(a: Place, b: Place): Network {
     routes: [{ key: "libre", code: "", name: "A pie o en bici", dirLabel: "", ids: ["A", "B"], loop: false, primary: true }],
   };
 }
+
+/* ───────── Combinado: a pie hasta un paradero, bus/Metro, a pie al destino ───────── */
+export type Combo = { net: Network; trip: Trip; walk1M: number; walk2M: number; board: string; alight: string };
+
+/** Lugares de una red a menos de `maxM` de un punto, del más cercano al más lejano. */
+function placesNear(net: Network, p: { lat: number; lng: number }, maxM: number, n = 3) {
+  const best = new Map<string, number>();
+  for (const s of Object.values(net.stops)) {
+    const d = distanceM(p, s);
+    if (d <= maxM && d < (best.get(s.place) ?? Infinity)) best.set(s.place, d);
+  }
+  return [...best].sort((a, b) => a[1] - b[1]).slice(0, n);
+}
+
+/**
+ * Mejores combinados entre dos direcciones, uno por red (como máximo 1.2 km a pie en cada punta).
+ * Se ordenan por un costo simple: metros a pie + metros en el vehículo / 4 (el bus avanza ~4 veces más rápido).
+ */
+export function findCombos(a: Place, b: Place, maxWalkM = 1200): Combo[] {
+  const out: Combo[] = [];
+  for (const net of NETWORKS) {
+    let best: (Combo & { score: number }) | null = null;
+    for (const [from, d1] of placesNear(net, a, maxWalkM)) {
+      for (const [to, d2] of placesNear(net, b, maxWalkM)) {
+        if (from === to) continue;
+        const trip = findTrip(net, from, to);
+        if (!trip) continue;
+        const score = (d1 + d2) * 1.25 + rideDistanceM(net, trip) / 4;
+        if (!best || score < best.score) best = { net, trip, walk1M: d1 * 1.25, walk2M: d2 * 1.25, board: from, alight: to, score };
+      }
+    }
+    if (best) { const { score: _s, ...c } = best; out.push(c); }
+  }
+  return out;
+}

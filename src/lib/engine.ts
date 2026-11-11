@@ -15,7 +15,7 @@
 import {
   quotes, type GoalId, type ModeId, type ModeOption, type Range, type Recommendation, type StatusLevel,
 } from "../data/content";
-import { ROJO, distanceM, findTrip, rideDistanceM, type Network } from "../data/networks";
+import { ROJO, distanceM, findCombos, findTrip, rideDistanceM, type Combo, type Network } from "../data/networks";
 
 /** Pasaje de referencia para las equivalencias ("N pasajes de bus"). */
 const REF_FARE = ROJO.fare;
@@ -152,24 +152,42 @@ export function recommend(input: EngineInput): Recommendation | null {
     note: "Eléctrico: no congestiona ni contamina. Usa ciclovía donde haya.",
   };
 
+  // ¿Una red está operando ahora? (hora de Lima)
+  const limaNow = input.now.toLocaleString("en-GB", { timeZone: "America/Lima", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  const hm = limaNow.slice(-5);
+  const closedNet = (n: Network) => !!n.hours && (() => {
+    const [a, b] = limaNow.startsWith("Sun") ? n.hours!.sunday : n.hours!.weekday;
+    return hm < a || hm >= b;
+  })();
+
+  // Combinado (solo sin bus): a pie hasta un paradero, bus o Metro, a pie al destino.
+  // Solo cuenta si de verdad te ahorra caminata y tiempo frente a caminar todo.
+  const walkAllMin = mid(walk.minutes);
+  const combo = !noBus ? null : findCombos(first, last)
+    .filter((c) => !closedNet(c.net))
+    .map((c: Combo) => {
+      const ride = ((rideDistanceM(c.net, c.trip) * 1.05) / 1000 / (peak ? c.net.speedKmh[0] : c.net.speedKmh[1])) * 60;
+      const w = peak ? c.net.wait.peak : c.net.wait.off;
+      const walkMin = (c.walk1M + c.walk2M) / 80;
+      const extra = c.net.kind === "rail" ? 3 : 0; // entrar y salir de la estación
+      const minutes: Range = [round(walkMin + ride * 0.9 + w[0] + extra), round(walkMin * 1.1 + ride * 1.2 + w[1] + extra + 3)];
+      return { c, ride, walkMin, minutes };
+    })
+    .filter((x) => x.walkMin <= walkAllMin * 0.6 && mid(x.minutes) < walkAllMin)
+    .sort((a, b) => mid(a.minutes) - mid(b.minutes))[0] ?? null;
+
   // Bus de la red elegida
   const rideKm = (rideDistanceM(net, trip) * 1.05) / 1000;
   const rideMin = (rideKm / (peak ? net.speedKmh[0] : net.speedKmh[1])) * 60;
-  // ¿La red está operando ahora? (hora de Lima)
-  const limaNow = input.now.toLocaleString("en-GB", { timeZone: "America/Lima", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
-  const hm = limaNow.slice(-5);
-  const closed = !!net.hours && (() => {
-    const [a, b] = limaNow.startsWith("Sun") ? net.hours!.sunday : net.hours!.weekday;
-    return hm < a || hm >= b;
-  })();
+  const closed = closedNet(net);
   const eta = input.busEta && "minutes" in input.busEta ? input.busEta : null;
   const noMore = !!input.busEta && "none" in input.busEta;
   // Sin dato en vivo: espera según la hora (Rojo) o según su frecuencia real (Expreso: cada 40–90 min).
   const wait: Range = eta ? [eta.minutes, eta.minutes]
     : noMore || closed ? [90, 120]
     : peak ? net.wait.peak : net.wait.off;
-  const fare = net.fare;
-  const busName = net.busName;
+  const fare = combo ? combo.c.net.fare : net.fare;
+  const busName = combo ? combo.c.net.busName : net.busName;
   const bus: ModeOption = {
     id: "bus", title: trip.route.name, subtitle: net.fare === 0 ? "Gratis" : `Ruta ${trip.route.code} · ${trip.route.dirLabel}`, icon: net.kind === "rail" ? "train" : "bus",
     minutes: net.kind === "rail"
@@ -186,6 +204,25 @@ export function recommend(input: EngineInput): Recommendation | null {
       net.rule,
     ].filter(Boolean).join(" "),
   };
+
+  if (combo) {
+    const c = combo.c;
+    const rail = c.net.kind === "rail";
+    Object.assign(bus, {
+      title: `A pie + ${c.net.name}`,
+      subtitle: `Subes en ${c.board} · bajas en ${c.alight}`,
+      icon: rail ? "train" : "bus",
+      minutes: combo.minutes,
+      cost: [c.net.fare, c.net.fare],
+      kcal: Math.round(((c.walk1M + c.walk2M) / 1000) * 55),
+      congestion: rail ? "Cero" : c.net.electric ? "Baja" : peak ? "Media" : "Baja",
+      note: [
+        `Caminas ${round(c.walk1M / 80)} min hasta ${c.board}, vas ${round(combo.ride)} min en ${c.net.busName} (${c.trip.stopIds.length - 1} ${rail ? "estaciones" : "paraderos"}) y caminas ${round(c.walk2M / 80)} min hasta tu destino.`,
+        "El tiempo incluye la espera.",
+        c.net.rule,
+      ].filter(Boolean).join(" "),
+    } satisfies Partial<ModeOption>);
+  }
 
   // Taxi (referencial)
   // El taxi va directo por calle (no sigue la ruta del bus, que puede ser un circuito).
@@ -228,11 +265,19 @@ export function recommend(input: EngineInput): Recommendation | null {
   if (noBus) {
     // Sin bus: se elige entre caminar, bici y scooter.
     const wheels = [bikeOk ? bike : null, scooterOk ? scooter : null].filter((o): o is ModeOption => !!o);
-    const quickest = [walk, ...wheels].sort((a, b) => mid(a.minutes) - mid(b.minutes))[0];
-    if (input.goal === "rapido") recommended = quickest.id as Exclude<ModeId, "taxi">;
-    else if (input.goal === "ahorro") recommended = wm <= 25 || !wheels.length ? "walk" : (wheels[0].id as Exclude<ModeId, "taxi">);
-    else recommended = wm <= 60 || !bikeOk ? "walk" : "bike";
-    why = status.level === 3 ? "Ojo: la calidad del aire no está buena ahora. Si puedes, espera o toma un bus."
+    const quickest = [walk, ...wheels, combo ? bus : null].filter((o): o is ModeOption => !!o)
+      .sort((a, b) => mid(a.minutes) - mid(b.minutes))[0];
+    if (status.level === 3 && combo) recommended = "bus";
+    else if (input.goal === "rapido") recommended = quickest.id as Exclude<ModeId, "taxi">;
+    else if (input.goal === "ahorro") recommended = wm <= 25 ? "walk" : wheels.length ? (wheels[0].id as Exclude<ModeId, "taxi">) : combo && wm > 45 ? "bus" : "walk";
+    else recommended = wm <= 60 && walkOk ? "walk" : bikeOk ? "bike" : combo ? "bus" : "walk";
+    const cn = combo?.c.net.name ?? "";
+    why = recommended === "bus"
+        ? status.level === 3 ? `Con el aire de ahora, mejor caminar poco: combina con ${cn}.`
+        : input.goal === "rapido" ? `Combinando con ${cn} llegas antes que caminando todo.`
+        : input.goal === "ahorro" ? `Es largo a pie: combina con ${cn}${fare === 0 ? ", que es gratis" : ` por ${soles(fare)}`}.`
+        : `Caminas ${round(combo!.walkMin)} min y ${busName} hace el resto.`
+      : status.level === 3 ? "Ojo: la calidad del aire no está buena ahora. Si puedes, espera o toma un bus."
       : recommended === "walk"
         ? wm > 60 ? "Es un tramo largo a pie. Si tienes bici o scooter, márcalo arriba."
         : input.goal === "rapido" && wheels.length ? "Para este tramo, caminando llegas igual de rápido."
@@ -293,9 +338,10 @@ export function recommend(input: EngineInput): Recommendation | null {
     : "Buen momento para caminar o pedalear.";
 
   const rec = { walk, bike, scooter, bus }[recommended];
+  const viaCombo = !!combo && recommended === "bus";
   const active = recommended !== "bus";
   const savings: Range =
-    noBus ? taxi.cost
+    active && fare === 0 ? taxi.cost
     : active ? [fare, taxi.cost[1]]
     : [Math.max(0, taxi.cost[0] - fare), Math.max(0, taxi.cost[1] - fare)];
 
@@ -304,7 +350,7 @@ export function recommend(input: EngineInput): Recommendation | null {
   const savingsHow: string[] = active
     ? [
         `Vas ${modeName}: tu viaje cuesta S/ 0.`,
-        noBus ? null : fare > 0 ? `Frente ${busName.startsWith("el ") ? "al " + busName.slice(3) : "a " + busName}: ahorras el pasaje, ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis, así que frente a él no hay diferencia.`,
+        noBus && !combo ? null : fare > 0 ? `Frente ${busName.startsWith("el ") ? "al " + busName.slice(3) : "a " + busName}: ahorras el pasaje, ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis, así que frente a él no hay diferencia.`,
         `Frente a un taxi (${solesRange(taxi.cost)} por ${taxiKm.toFixed(1)} km): ahorras hasta ${soles(taxi.cost[1])}.`,
       ].filter((x): x is string => !!x)
     : [
@@ -320,11 +366,11 @@ export function recommend(input: EngineInput): Recommendation | null {
     createdAt: input.now.toISOString(),
     status,
     route: {
-      from: input.from, via: noBus ? `${(walkM / 1000).toFixed(1)} km` : middle.place, to: input.to,
-      routeLabel: noBus ? "A pie o en bici" : trip.route.loop ? `${net.name} · ${trip.route.code}` : net.kind === "rail" ? `${net.name} · ${trip.route.dirLabel}` : `${net.name} · Ruta ${trip.route.code} · ${trip.route.dirLabel}`,
-      note: noBus ? `${(walkM / 1000).toFixed(1)} km por calles` : `${trip.stopIds.length - 1} ${net.kind === "rail" ? "estaciones" : "paraderos"}`,
+      from: input.from, via: viaCombo ? `${combo!.c.board} → ${combo!.c.alight}` : noBus ? `${(walkM / 1000).toFixed(1)} km` : middle.place, to: input.to,
+      routeLabel: viaCombo ? bus.title : noBus ? "A pie o en bici" : trip.route.loop ? `${net.name} · ${trip.route.code}` : net.kind === "rail" ? `${net.name} · ${trip.route.dirLabel}` : `${net.name} · Ruta ${trip.route.code} · ${trip.route.dirLabel}`,
+      note: viaCombo ? `${combo!.c.trip.stopIds.length - 1} ${combo!.c.net.kind === "rail" ? "estaciones" : "paraderos"} + ${round(combo!.walkMin)} min a pie` : noBus ? `${(walkM / 1000).toFixed(1)} km por calles` : `${trip.stopIds.length - 1} ${net.kind === "rail" ? "estaciones" : "paraderos"}`,
     },
-    options: noBus ? [walk, bike, scooter, taxi] : [walk, bike, scooter, bus, taxi],
+    options: noBus ? [walk, bike, scooter, ...(combo ? [bus] : []), taxi] : [walk, bike, scooter, bus, taxi],
     recommended,
     why,
     savings,
@@ -377,10 +423,14 @@ export function recommend(input: EngineInput): Recommendation | null {
         kcal: o.kcal,
       };
     })(),
-    path: noBus && sw?.path && sw.path.length > 1
+    path: viaCombo
+      ? [{ lat: first.lat, lng: first.lng, name: first.place },
+         ...combo!.c.trip.stopIds.map((id) => { const st = combo!.c.net.stops[id]; return { lat: st.lat, lng: st.lng, name: st.place }; }),
+         { lat: last.lat, lng: last.lng, name: last.place }]
+      : noBus && sw?.path && sw.path.length > 1
       ? sw.path.map(([lat, lng], i, a) => ({ lat, lng, name: i === 0 ? first.place : i === a.length - 1 ? last.place : "" }))
       : trip.stopIds.map((id) => ({ lat: stops[id].lat, lng: stops[id].lng, name: stops[id].place })),
     live: !!eta && eta.source === "live",
-    noBus,
+    noBus: noBus && !viaCombo,
   };
 }
