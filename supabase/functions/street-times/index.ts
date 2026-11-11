@@ -7,6 +7,7 @@
 //
 // Uso: GET ?from=lat,lng&to=lat,lng
 // Respuesta: { walk: { m, s } | null, bike: { m, s } | null }   (m = metros, s = segundos)
+// API: api.heigit.org/openrouteservice (la dirección vieja api.openrouteservice.org está deprecada).
 // Plan gratis de ORS: 2.000 rutas/día. Se guarda cada tramo 24 h en memoria para no gastar de más.
 
 const CORS = {
@@ -35,10 +36,13 @@ function parse(v: string | null): [number, number] | null {
 
 async function route(profile: "foot-walking" | "cycling-regular", a: [number, number], b: [number, number], key: string): Promise<Leg> {
   try {
-    const r = await fetch(
-      `https://api.openrouteservice.org/v2/directions/${profile}?start=${a[1]},${a[0]}&end=${b[1]},${b[0]}`,
-      { headers: { Authorization: key, Accept: "application/geo+json" }, signal: AbortSignal.timeout(6000) },
-    );
+    // Dirección vigente de HeiGIT (api.openrouteservice.org está deprecada y con cupo reducido).
+    const r = await fetch(`https://api.heigit.org/openrouteservice/v2/directions/${profile}/geojson`, {
+      method: "POST",
+      headers: { Authorization: key, "Content-Type": "application/json", Accept: "application/geo+json" },
+      body: JSON.stringify({ coordinates: [[a[1], a[0]], [b[1], b[0]]] }),
+      signal: AbortSignal.timeout(6000),
+    });
     if (!r.ok) return null;
     const d = await r.json();
     const sum = d?.features?.[0]?.properties?.summary;
