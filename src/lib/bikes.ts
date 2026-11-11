@@ -28,14 +28,16 @@ async function query(layer: string, bbox: BBox): Promise<FeatureCollection | nul
     geometryType: "esriGeometryEnvelope",
     inSR: "4326",
     spatialRel: "esriSpatialRelIntersects",
-    outFields: "Nombre_de,TIPO",
+    outFields: "*",
     outSR: "4326",
     f: "geojson",
   });
   try {
     const r = await fetch(`${SVC}${layer}/FeatureServer/0/query?${params}`);
     if (!r.ok) return null;
-    return (await r.json()) as FeatureCollection;
+    const j = await r.json();
+    // ArcGIS responde 200 con {error} cuando algo falla: validar antes de pintar.
+    return j?.type === "FeatureCollection" && Array.isArray(j.features) ? (j as FeatureCollection) : null;
   } catch {
     return null;
   }
