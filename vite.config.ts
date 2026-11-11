@@ -17,7 +17,7 @@ export default defineConfig({
       manifest: {
         name: "YIO · Por el bienestar común",
         short_name: "YIO",
-        description: "¿Camino, bici o bus? YIO te dice qué conviene en tu tramo del Corredor Rojo.",
+        description: "¿Camino, bici o bus? YIO te dice qué conviene en tu tramo, con datos en vivo de Lima.",
         lang: "es-PE",
         start_url: "./",
         scope: "./",

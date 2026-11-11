@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { brand, themes, type ThemeName } from "./config/brand";
 import type { GoalId, Recommendation } from "./data/content";
-import { destinationGroups, findTrip, nearestPlace, placeGroups } from "./data/rojo";
+import { NETWORKS, destinationGroups, findTrip, nearestPlace, networkById, placeGroups, type NetworkId } from "./data/networks";
 import { recommend } from "./lib/engine";
 import { getAir, getNextBusMinutes, getWeather, type Air, type Weather } from "./lib/live";
 import { addRemote, clearRemote, deleteRemote, loadLocal, loadPending, loadRemote, storeLocal, storePending, type SavedTrip } from "./lib/savings";
@@ -33,6 +33,10 @@ function initialTheme(): ThemeName {
 export default function App() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme);
   const [goal, setGoal] = useState<GoalId>("ahorro");
+  const [networkId, setNetworkId] = useState<NetworkId>(() => {
+    try { return (localStorage.getItem("yio.network") as NetworkId) || "rojo"; } catch { return "rojo"; }
+  });
+  const net = networkById(networkId) ?? networkById("rojo");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [hasBike, setHasBike] = useState<boolean>(() => { try { return localStorage.getItem("yio.hasBike") === "1"; } catch { return false; } });
@@ -52,7 +56,18 @@ export default function App() {
   const [pending, setPending] = useState<SavedTrip[]>(loadPending);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const toGroups = useMemo(() => (from ? destinationGroups(from) : []), [from]);
+  const fromGroups = useMemo(() => placeGroups(net), [net]);
+  const toGroups = useMemo(() => (from ? destinationGroups(net, from) : []), [net, from]);
+
+  useEffect(() => { try { localStorage.setItem("yio.network", networkId); } catch { /* noop */ } }, [networkId]);
+
+  const changeNetwork = (id: NetworkId) => {
+    if (id === networkId) return;
+    setNetworkId(id);
+    setFrom("");
+    setTo("");
+    setResult(null);
+  };
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -112,9 +127,9 @@ export default function App() {
     } catch { /* noop */ }
   }, [hasBike, hasScooter]);
 
-  const changeFrom = (v: string) => {
+  const changeFrom = (v: string, netId: NetworkId = networkId) => {
     setFrom(v);
-    const next = destinationGroups(v).flatMap((g) => g.places);
+    const next = destinationGroups(networkById(netId), v).flatMap((g) => g.places);
     if (!next.includes(to)) setTo("");
   };
 
@@ -123,10 +138,14 @@ export default function App() {
       if (!navigator.geolocation) return resolve("Tu navegador no permite ubicarte.");
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const { place, meters } = nearestPlace(pos.coords.latitude, pos.coords.longitude);
-          if (meters > 3000) return resolve("No hay paraderos del Corredor Rojo cerca de ti (a más de 3 km).");
-          changeFrom(place);
-          resolve(`Paradero más cercano: ${place}, a unos ${Math.round(meters / 10) * 10} m.`);
+          // Busca en todos los corredores y se queda con el paradero más cercano.
+          const best = NETWORKS
+            .map((n) => ({ n, ...nearestPlace(n, pos.coords.latitude, pos.coords.longitude) }))
+            .sort((a, b) => a.meters - b.meters)[0];
+          if (!best || best.meters > 3000) return resolve("No hay paraderos de los corredores de YIO cerca de ti (a más de 3 km).");
+          if (best.n.id !== networkId) { setNetworkId(best.n.id); setResult(null); }
+          changeFrom(best.place, best.n.id);
+          resolve(`Paradero más cercano: ${best.place} (${best.n.name}), a unos ${Math.round(best.meters / 10) * 10} m.`);
         },
         () => resolve("No pudimos ver tu ubicación. Revisa el permiso del navegador."),
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
@@ -135,9 +154,9 @@ export default function App() {
 
   const calculate = async () => {
     setLoading(true);
-    const trip = findTrip(from, to);
-    const nextBusMin = trip ? await getNextBusMinutes(trip.stopIds[0], trip.routeKey.split("|")[0]) : null;
-    const r = recommend({ from, to, goal, now: new Date(), weather, air, nextBusMin, hasBike, hasScooter });
+    const trip = findTrip(net, from, to);
+    const nextBusMin = trip && net.live ? await getNextBusMinutes(trip.stopIds[0], trip.route.code) : null;
+    const r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, nextBusMin, hasBike, hasScooter });
     setResult(r);
     setSaveState({ kind: "idle" });
     setLoading(false);
@@ -227,7 +246,10 @@ export default function App() {
           weather={weather}
           air={air}
           liveLoading={liveLoading}
-          fromGroups={placeGroups}
+          networks={NETWORKS}
+          networkId={networkId}
+          onNetwork={changeNetwork}
+          fromGroups={fromGroups}
           toGroups={toGroups}
           onLocate={locate}
           hasBike={hasBike}
@@ -236,7 +258,7 @@ export default function App() {
           onHasScooter={setHasScooter}
           from={from}
           to={to}
-          onFrom={changeFrom}
+          onFrom={(v) => changeFrom(v)}
           onTo={setTo}
           goal={goal}
           onGoalChange={setGoal}

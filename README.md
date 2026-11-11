@@ -1,14 +1,16 @@
 # YIO
 
-**Por el bienestar común.** ¿Camino o tomo el bus? YIO compara caminar, el Corredor Rojo y el taxi para tu tramo, con el clima y el aire de ahora, y te dice qué conviene según lo que buscas hoy: moverte rápido, ahorrar, evitar tráfico o sentirte mejor.
+**Por el bienestar común.** ¿Camino, bici o bus? YIO compara caminar, bici, scooter, el bus del corredor y el taxi para tu tramo, con el clima y el aire de ahora, y te dice qué conviene según lo que buscas hoy: moverte rápido, ahorrar, evitar tráfico o sentirte mejor.
 
 **Demo en vivo:** https://4ngelinepe.github.io/yio/
 
-Fase 1: uso personal y con amigos, solo Corredor Rojo. (Antes `geo-wireframe-mvp`; si encuentras ese nombre en algún lado, es el mismo proyecto.)
+Fase 1: uso personal y con amigos. Corredores: Corredor Rojo y Expreso San Isidro. (Antes `geo-wireframe-mvp`; si encuentras ese nombre en algún lado, es el mismo proyecto.)
 
 ## Qué hace hoy
 
-- Tramos entre 144 paraderos del Corredor Rojo (rutas 201, 204, 206, 209).
+- Corredor Rojo: 144 paraderos (rutas 201, 204, 206, 209), con llegadas en vivo.
+- Expreso San Isidro: 3 rutas circulares, gratuito y eléctrico (sin llegadas en vivo aún).
+- Bici y scooter propios como opciones; app instalable con modo offline.
 - Recomendación caminar vs. bus con reglas transparentes (ver `src/lib/engine.ts`). El taxi se usa solo como referencia de ahorro.
 - Clima y calidad del aire en vivo (Open-Meteo).
 - Llegadas del bus en vivo vía intermediario (`supabase/functions/rojo-arrivals`); si no responde, usa espera estimada.
@@ -29,12 +31,13 @@ Cada push a `main` se publica solo en GitHub Pages (`.github/workflows/deploy.ym
 
 | Dato | Fuente | Archivo |
 |---|---|---|
-| Paraderos y rutas del Rojo | ubicATUbus (app.corredorrojo.pe), snapshot 10 nov 2026 | `src/data/rojo.json`, `src/data/rojo.ts` |
-| Corredores Azul y Morado (aún sin uso) | Webs oficiales | `src/data/bus-routes.ts` |
+| Paraderos y rutas del Rojo | ubicATUbus (app.corredorrojo.pe), snapshot 10 nov 2026 | `src/data/rojo.json`, `src/data/networks.ts` |
+| Paraderos y rutas del Expreso San Isidro | Zenbus (Municipalidad de San Isidro), snapshot 11 nov 2026 | `src/data/esi.json`, `src/data/networks.ts` |
+| Corredores Azul y Morado (aún sin uso: faltan coordenadas) | Webs oficiales y portal QR de la ATU | `src/data/bus-routes.ts` |
 | Clima y aire | Open-Meteo (gratis, no comercial) | `src/lib/live.ts` |
 | Llegadas en vivo | API del Rojo vía Edge Function | `supabase/functions/rojo-arrivals` |
 
-El API del Rojo no es público para terceros: el uso en Fase 1 es moderado y personal. Antes de cualquier uso comercial, pedir permiso a la ATU/operador.
+El API del Rojo y los datos de Zenbus no son públicos para terceros: el uso en Fase 1 es moderado y personal. Antes de cualquier uso comercial, pedir permiso a la ATU/operador y a la Municipalidad de San Isidro.
 
 ## Supabase
 

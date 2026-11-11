@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { ArrowDown, Bike, Loader2, LocateFixed, Scooter } from "lucide-react";
 import { goals, type GoalId } from "../data/content";
-import type { PlaceGroup } from "../data/rojo";
+import type { Network, NetworkId, PlaceGroup } from "../data/networks";
 import type { Air, Weather } from "../lib/live";
 import { cx } from "../lib/tones";
 import { Icon } from "./ui/Icon";
 import { Button, Card } from "./ui/primitives";
 
 type Props = {
+  networks: Network[];
+  networkId: NetworkId;
+  onNetwork: (id: NetworkId) => void;
   weather: Weather | null;
   air: Air | null;
   liveLoading: boolean;
@@ -87,7 +90,7 @@ export function DailyRecommendation(p: Props) {
       {/* Tramo */}
       <div className="mt-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg text-ink">¿Qué tramo del Corredor Rojo vas a hacer?</h2>
+          <h2 className="text-lg text-ink">¿Qué tramo vas a hacer?</h2>
           <button
             type="button"
             onClick={locate}
@@ -97,6 +100,25 @@ export function DailyRecommendation(p: Props) {
             {locating ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
             Paradero más cercano
           </button>
+        </div>
+        <div role="radiogroup" aria-label="Corredor" className="mb-4 flex flex-wrap gap-2">
+          {p.networks.map((n) => {
+            const active = n.id === p.networkId;
+            return (
+              <button
+                key={n.id} type="button" role="radio" aria-checked={active}
+                onClick={() => p.onNetwork(n.id)}
+                className={cx(
+                  "rounded-full border px-4 py-2 text-sm transition",
+                  active ? "border-primary bg-primary text-primary-fg" : "border-line text-ink hover:bg-surface-muted",
+                )}
+              >
+                {n.name}
+                {n.fare === 0 && <span className={cx("ml-1.5 text-xs", active ? "opacity-80" : "text-success-text")}>· gratis</span>}
+              </button>
+            );
+          })}
+          <span className="rounded-full border border-dashed border-line px-4 py-2 text-sm text-subtle">Azul y Morado · pronto</span>
         </div>
         <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <StopSelect id="from" label="Desde" value={p.from} groups={p.fromGroups} placeholder="Elige tu paradero" onChange={p.onFrom} />

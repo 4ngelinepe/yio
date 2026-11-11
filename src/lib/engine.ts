@@ -15,10 +15,14 @@
 import {
   quotes, type GoalId, type ModeId, type ModeOption, type Range, type Recommendation, type StatusLevel,
 } from "../data/content";
-import { ROJO_FARE, distanceM, findTrip, rideDistanceM, routeLabel, stops } from "../data/rojo";
+import { ROJO, distanceM, findTrip, rideDistanceM, type Network } from "../data/networks";
+
+/** Pasaje de referencia para las equivalencias ("N pasajes de bus"). */
+const REF_FARE = ROJO.fare;
 import type { Air, Weather } from "./live";
 
 export type EngineInput = {
+  network: Network;
   from: string;
   to: string;
   goal: GoalId;
@@ -59,7 +63,9 @@ function airStatus(air: Air | null, weather: Weather | null): { level: StatusLev
 }
 
 export function recommend(input: EngineInput): Recommendation | null {
-  const trip = findTrip(input.from, input.to);
+  const net = input.network;
+  const stops = net.stops;
+  const trip = findTrip(net, input.from, input.to);
   if (!trip) return null;
 
   const first = stops[trip.stopIds[0]];
@@ -100,25 +106,33 @@ export function recommend(input: EngineInput): Recommendation | null {
     note: "Eléctrico: no congestiona ni contamina. Usa ciclovía donde haya.",
   };
 
-  // Bus Rojo
-  const rideKm = (rideDistanceM(trip) * 1.05) / 1000;
+  // Bus de la red elegida
+  const rideKm = (rideDistanceM(net, trip) * 1.05) / 1000;
   const rideMin = (rideKm / (peak ? 11 : 17)) * 60;
-  const wait: Range = input.nextBusMin !== null ? [input.nextBusMin, input.nextBusMin] : peak ? [3, 8] : [4, 12];
+  // Sin dato en vivo: espera según la hora (Rojo) o según frecuencia aproximada (redes sin vivo).
+  const wait: Range = input.nextBusMin !== null ? [input.nextBusMin, input.nextBusMin]
+    : !net.live ? [5, 15] : peak ? [3, 8] : [4, 12];
+  const fare = net.fare;
+  const busName = net.id === "rojo" ? "el Rojo" : "el Expreso";
   const bus: ModeOption = {
-    id: "bus", title: `Corredor Rojo ${trip.routeKey.split("|")[0]}`, subtitle: routeLabel(trip.routeKey), icon: "bus",
+    id: "bus", title: trip.route.name, subtitle: net.fare === 0 ? "Gratis" : `Ruta ${trip.route.code} · ${trip.route.dirLabel}`, icon: "bus",
     minutes: [round(rideMin * 0.9 + wait[0] + 2), round(rideMin * 1.2 + wait[1] + 5)],
-    cost: [ROJO_FARE, ROJO_FARE],
+    cost: [fare, fare],
     kcal: 0,
-    congestion: peak ? "Media" : "Baja",
-    note: input.nextBusMin !== null ? `Próximo bus en ${input.nextBusMin} min` : "Espera estimada según la hora",
+    congestion: net.electric ? "Baja" : peak ? "Media" : "Baja",
+    note: input.nextBusMin !== null ? `Próximo bus en ${input.nextBusMin} min`
+      : net.live ? "Espera estimada según la hora"
+      : `${net.electric ? "Eléctrico. " : ""}Espera estimada: aún sin datos en vivo.`,
   };
 
   // Taxi (referencial)
-  const taxiMin = (rideKm / (peak ? 14 : 24)) * 60;
+  // El taxi va directo por calle (no sigue la ruta del bus, que puede ser un circuito).
+  const taxiKm = (walkM / 1000) * 1.1;
+  const taxiMin = (taxiKm / (peak ? 14 : 24)) * 60;
   const taxi: ModeOption = {
     id: "taxi", title: "Taxi / app", subtitle: "Tarifa referencial", icon: "car",
     minutes: [round(taxiMin * 0.9 + 3), round(taxiMin * 1.3 + 8)],
-    cost: [roundHalf(Math.max(7, 5 + 1.5 * rideKm)), roundHalf(Math.max(10, 7 + 2.2 * rideKm))],
+    cost: [roundHalf(Math.max(7, 5 + 1.5 * taxiKm)), roundHalf(Math.max(10, 7 + 2.2 * taxiKm))],
     kcal: 0,
     congestion: peak ? "Alta" : "Media",
   };
@@ -143,21 +157,27 @@ export function recommend(input: EngineInput): Recommendation | null {
       why = recommended === "walk" ? "Caminando llegas antes que esperando el bus."
         : recommended === "bike" ? "En bici llegas antes que en bus, y sin tráfico."
         : recommended === "scooter" ? "En scooter llegas antes que en bus y no sumas un auto más."
-        : "Para este tramo, el Rojo te deja antes.";
+        : `Para este tramo, ${busName} te deja antes.`;
       break;
     case "ahorro":
-      recommended = walkOk && wm <= 25 ? "walk" : bikeOk ? "bike" : scooterOk ? "scooter" : walkOk && wm <= 45 ? "walk" : "bus";
-      why = recommended === "walk" ? "Es un tramo caminable: te ahorras el pasaje completo."
+      if (fare === 0) {
+        // Bus gratis: todo cuesta S/ 0, gana lo que llegue antes sin auto.
+        recommended = bikeOk ? "bike" : scooterOk ? "scooter" : walkOk && wm <= mid(bus.minutes) ? "walk" : "bus";
+      } else {
+        recommended = walkOk && wm <= 25 ? "walk" : bikeOk ? "bike" : scooterOk ? "scooter" : walkOk && wm <= 45 ? "walk" : "bus";
+      }
+      why = recommended === "walk"
+          ? fare === 0 ? `Caminando llegas antes que en ${busName} y no gastas nada.` : "Es un tramo caminable: te ahorras el pasaje completo."
         : recommended === "bike" ? "En bici te ahorras el pasaje y llegas más rápido que caminando."
         : recommended === "scooter" ? "En scooter te ahorras el pasaje y no congestionas."
-        : "El tramo es largo para caminar; el Rojo es la opción más barata.";
+        : fare === 0 ? `${busName.charAt(0).toUpperCase()}${busName.slice(1)} te deja antes, y es gratis y eléctrico.` : `El tramo es largo para caminar; ${busName} es la opción más barata.`;
       break;
     case "trafico":
       recommended = bikeOk && bm <= mid(bus.minutes) + 10 ? "bike" : scooterOk && sm <= mid(bus.minutes) + 10 ? "scooter" : walkOk && wm <= (peak ? 50 : 35) ? "walk" : "bus";
       why = recommended === "bike" ? "En bici esquivas el tráfico y no sumas un auto más."
         : recommended === "scooter" ? "En scooter esquivas el tráfico y no sumas un auto más."
         : recommended === "walk" ? (peak ? "Es hora punta: caminando no dependes del tráfico." : "Caminando no sumas al tráfico.")
-        : "El tramo es largo para caminar; el Rojo evita el taxi en el tráfico.";
+        : `El tramo es largo para caminar; ${busName} evita el taxi en el tráfico.`;
       break;
     default:
       recommended = walkOk && wm <= 60 ? "walk" : bikeOk ? "bike" : scooterOk ? "scooter" : "bus";
@@ -171,8 +191,8 @@ export function recommend(input: EngineInput): Recommendation | null {
   const rec = { walk, bike, scooter, bus }[recommended];
   const active = recommended !== "bus";
   const savings: Range =
-    active ? [ROJO_FARE, taxi.cost[1]]
-    : [Math.max(0, taxi.cost[0] - ROJO_FARE), Math.max(0, taxi.cost[1] - ROJO_FARE)];
+    active ? [fare, taxi.cost[1]]
+    : [Math.max(0, taxi.cost[0] - fare), Math.max(0, taxi.cost[1] - fare)];
 
   const monthly: Range = [savings[0] * 20, savings[1] * 20];
   const walkKm = walkM / 1000;
@@ -181,7 +201,7 @@ export function recommend(input: EngineInput): Recommendation | null {
     createdAt: input.now.toISOString(),
     status,
     route: {
-      from: input.from, via: middle.place, to: input.to, routeLabel: routeLabel(trip.routeKey),
+      from: input.from, via: middle.place, to: input.to, routeLabel: trip.route.loop ? `${net.name} · ${trip.route.code}` : `${net.name} · Ruta ${trip.route.code} · ${trip.route.dirLabel}`,
       note: `${trip.stopIds.length - 1} paraderos`,
     },
     options: [walk, bike, scooter, bus, taxi],
@@ -208,7 +228,7 @@ export function recommend(input: EngineInput): Recommendation | null {
       ],
       equivalences: [
         `${Math.floor(mid(monthly) / 12)} menús de almuerzo`,
-        `${Math.floor(mid(monthly) / ROJO_FARE)} pasajes del Rojo`,
+        `${Math.floor(mid(monthly) / REF_FARE)} pasajes de bus`,
       ],
     },
     quote: quotes[input.goal][input.now.getDate() % quotes[input.goal].length],

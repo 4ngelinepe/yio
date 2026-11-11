@@ -56,7 +56,7 @@ export function DirectComparison({ data }: { data: Recommendation }) {
         {ordered.map((o) => <Option key={o.id} o={o} recommended={o.id === data.recommended} />)}
       </div>
       <p className="mt-6 text-sm text-subtle">
-        Tiempos y costos estimados. Pasaje del Corredor Rojo S/ 2.43; tarifa de taxi referencial.
+        Tiempos y costos estimados. Pasaje según la tarifa de cada corredor; tarifa de taxi referencial.
       </p>
     </Card>
   );
