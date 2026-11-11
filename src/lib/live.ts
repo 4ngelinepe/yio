@@ -7,7 +7,7 @@
  *   Si no responden, YIO usa frecuencias estimadas.
  */
 import type { IconName } from "../data/content";
-import { ARRIVALS_URL, ESI_ARRIVALS_URL } from "./supabase";
+import { ARRIVALS_URL, ESI_ARRIVALS_URL, STREET_TIMES_URL } from "./supabase";
 import type { Network, Trip } from "../data/networks";
 
 export type HourForecast = { hour: string; temp: number; label: string; icon: IconName; rainProb: number };
@@ -121,6 +121,19 @@ export async function getBusEta(net: Network, trip: Trip): Promise<BusEta> {
     };
     if (d.minutes !== null && d.source) return { minutes: d.minutes, source: d.source };
     return d.reason === "sin-salidas" ? { none: true } : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Tiempos reales por calles (OpenRouteService vía street-times). m = metros, s = segundos. */
+export type StreetTimes = { walk: { m: number; s: number } | null; bike: { m: number; s: number } | null };
+
+export async function getStreetTimes(a: { lat: number; lng: number }, b: { lat: number; lng: number }): Promise<StreetTimes | null> {
+  const f = (p: { lat: number; lng: number }) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`;
+  try {
+    const d = (await getJson(`${STREET_TIMES_URL}?from=${f(a)}&to=${f(b)}`, 7000)) as StreetTimes;
+    return d && (d.walk || d.bike) ? d : null;
   } catch {
     return null;
   }

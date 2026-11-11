@@ -19,7 +19,7 @@ import { ROJO, distanceM, findTrip, rideDistanceM, type Network } from "../data/
 
 /** Pasaje de referencia para las equivalencias ("N pasajes de bus"). */
 const REF_FARE = ROJO.fare;
-import type { Air, BusEta, Weather } from "./live";
+import type { Air, BusEta, StreetTimes, Weather } from "./live";
 
 export type EngineInput = {
   network: Network;
@@ -30,6 +30,8 @@ export type EngineInput = {
   weather: Weather | null;
   air: Air | null;
   busEta: BusEta;
+  /** Tiempos reales por calles; si es null se estima en línea recta. */
+  streets?: StreetTimes | null;
   hasBike: boolean;
   hasScooter: boolean;
 };
@@ -74,30 +76,37 @@ export function recommend(input: EngineInput): Recommendation | null {
   const middle = stops[trip.stopIds[Math.floor(trip.stopIds.length / 2)]];
   const peak = isPeak(input.now);
 
+  // Distancias y tiempos: reales por calles (OpenRouteService) si hay; si no, línea recta × 1.2.
+  const sw = input.streets?.walk ?? null;
+  const sb = input.streets?.bike ?? null;
+  const walkM = sw ? sw.m : distanceM(first, last) * 1.2;
+  const bikeM = sb ? sb.m : walkM;
+  const realNote = "Tiempo por calles reales (OpenStreetMap).";
+
   // Caminar
-  const walkM = distanceM(first, last) * 1.2;
-  const walkMin = walkM / 80;
+  const walkMin = sw ? sw.s / 60 : walkM / 80;
   const walk: ModeOption = {
     id: "walk", title: "Caminar este tramo", subtitle: "Sin pasaje, sin tráfico", icon: "footprints",
-    minutes: [round(walkMin * 0.9), round(walkMin * 1.1)],
+    minutes: sw ? [round(walkMin * 0.95), round(walkMin * 1.1)] : [round(walkMin * 0.9), round(walkMin * 1.1)],
     cost: [0, 0],
     kcal: Math.round((walkM / 1000) * 55),
     congestion: "Cero",
+    note: sw ? `${realNote} ${(walkM / 1000).toFixed(1)} km.` : undefined,
   };
 
-  // Bici
-  const bikeMin = (walkM / 1000 / 14) * 60;
+  // Bici (+2–4 min para sacar y estacionar)
+  const bikeMin = sb ? sb.s / 60 : (bikeM / 1000 / 14) * 60;
   const bike: ModeOption = {
     id: "bike", title: "Ir en bici", subtitle: input.hasBike ? "Con tu bici" : "Si tienes bici a la mano", icon: "bike",
-    minutes: [round(bikeMin * 0.9 + 2), round(bikeMin * 1.2 + 4)],
+    minutes: sb ? [round(bikeMin + 2), round(bikeMin * 1.15 + 4)] : [round(bikeMin * 0.9 + 2), round(bikeMin * 1.2 + 4)],
     cost: [0, 0],
-    kcal: Math.round((walkM / 1000) * 28),
+    kcal: Math.round((bikeM / 1000) * 28),
     congestion: "Cero",
-    note: "Revisa las ciclovías del tramo en el mapa.",
+    note: sb ? `${realNote} Revisa las ciclovías en el mapa.` : "Revisa las ciclovías del tramo en el mapa.",
   };
 
-  // Scooter eléctrico (propio)
-  const scooterMin = (walkM / 1000 / 16) * 60;
+  // Scooter eléctrico (propio): misma ruta que la bici, a ~16 km/h
+  const scooterMin = (bikeM / 1000 / 16) * 60;
   const scooter: ModeOption = {
     id: "scooter", title: "Ir en scooter", subtitle: input.hasScooter ? "Con tu scooter" : "Si tienes scooter a la mano", icon: "scooter",
     minutes: [round(scooterMin * 0.9 + 2), round(scooterMin * 1.2 + 4)],

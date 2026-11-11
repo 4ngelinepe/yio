@@ -36,6 +36,7 @@ Cada push a `main` se publica solo en GitHub Pages (`.github/workflows/deploy.ym
 | Corredores Azul y Morado (aún sin uso: faltan coordenadas) | Webs oficiales y portal QR de la ATU | `src/data/bus-routes.ts` |
 | Clima y aire | Open-Meteo (gratis, no comercial) | `src/lib/live.ts` |
 | Llegadas en vivo · Rojo | API del Rojo vía Edge Function | `supabase/functions/rojo-arrivals` |
+| Tiempos a pie y en bici | OpenRouteService (OpenStreetMap) vía Edge Function, clave en secreto ORS_KEY | `supabase/functions/street-times` |
 | Llegadas en vivo · Expreso | Zenbus (protobuf) vía Edge Function, con horario programado de respaldo | `supabase/functions/esi-arrivals` |
 
 El API del Rojo y los datos de Zenbus no son públicos para terceros: el uso en Fase 1 es moderado y personal. Antes de cualquier uso comercial, pedir permiso a la ATU/operador y a la Municipalidad de San Isidro.
