@@ -295,7 +295,8 @@ export function recommend(input: EngineInput): Recommendation | null {
   const rec = { walk, bike, scooter, bus }[recommended];
   const active = recommended !== "bus";
   const savings: Range =
-    active ? [fare, taxi.cost[1]]
+    noBus ? taxi.cost
+    : active ? [fare, taxi.cost[1]]
     : [Math.max(0, taxi.cost[0] - fare), Math.max(0, taxi.cost[1] - fare)];
 
   // Cómo se llega al ahorro de hoy, en palabras.
