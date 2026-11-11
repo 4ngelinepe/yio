@@ -19,6 +19,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 
 /** Intermediario de llegadas en vivo del Corredor Rojo (supabase/functions/rojo-arrivals). */
 export const ARRIVALS_URL = `${SUPABASE_URL}/functions/v1/rojo-arrivals`;
+export const ESI_ARRIVALS_URL = `${SUPABASE_URL}/functions/v1/esi-arrivals`;
 
 /** A dónde vuelve el usuario después de tocar el link del correo. */
 export const redirectUrl = () => location.origin + location.pathname;

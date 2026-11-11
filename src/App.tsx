@@ -3,7 +3,7 @@ import { brand, themes, type ThemeName } from "./config/brand";
 import type { GoalId, Recommendation } from "./data/content";
 import { NETWORKS, destinationGroups, findTrip, nearestPlace, networkById, placeGroups, type NetworkId } from "./data/networks";
 import { recommend } from "./lib/engine";
-import { getAir, getNextBusMinutes, getWeather, type Air, type Weather } from "./lib/live";
+import { getAir, getBusEta, getWeather, type Air, type Weather } from "./lib/live";
 import { addRemote, clearRemote, deleteRemote, loadLocal, loadPending, loadRemote, storeLocal, storePending, type SavedTrip } from "./lib/savings";
 import { supabase } from "./lib/supabase";
 import { LoginPanel } from "./components/LoginPanel";
@@ -155,8 +155,8 @@ export default function App() {
   const calculate = async () => {
     setLoading(true);
     const trip = findTrip(net, from, to);
-    const nextBusMin = trip && net.live ? await getNextBusMinutes(trip.stopIds[0], trip.route.code) : null;
-    const r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, nextBusMin, hasBike, hasScooter });
+    const busEta = trip ? await getBusEta(net, trip) : null;
+    const r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, hasBike, hasScooter });
     setResult(r);
     setSaveState({ kind: "idle" });
     setLoading(false);

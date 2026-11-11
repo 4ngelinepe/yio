@@ -19,7 +19,7 @@ import { ROJO, distanceM, findTrip, rideDistanceM, type Network } from "../data/
 
 /** Pasaje de referencia para las equivalencias ("N pasajes de bus"). */
 const REF_FARE = ROJO.fare;
-import type { Air, Weather } from "./live";
+import type { Air, BusEta, Weather } from "./live";
 
 export type EngineInput = {
   network: Network;
@@ -29,7 +29,7 @@ export type EngineInput = {
   now: Date;
   weather: Weather | null;
   air: Air | null;
-  nextBusMin: number | null;
+  busEta: BusEta;
   hasBike: boolean;
   hasScooter: boolean;
 };
@@ -109,9 +109,11 @@ export function recommend(input: EngineInput): Recommendation | null {
   // Bus de la red elegida
   const rideKm = (rideDistanceM(net, trip) * 1.05) / 1000;
   const rideMin = (rideKm / (peak ? 11 : 17)) * 60;
-  // Sin dato en vivo: espera según la hora (Rojo) o según frecuencia aproximada (redes sin vivo).
-  const wait: Range = input.nextBusMin !== null ? [input.nextBusMin, input.nextBusMin]
-    : !net.live ? [5, 15] : peak ? [3, 8] : [4, 12];
+  const eta = input.busEta && "minutes" in input.busEta ? input.busEta : null;
+  const noMore = !!input.busEta && "none" in input.busEta;
+  // Sin dato en vivo: espera según la hora (Rojo) o según su frecuencia real (Expreso: cada 40–90 min).
+  const wait: Range = eta ? [eta.minutes, eta.minutes]
+    : net.id === "esi" ? (noMore ? [90, 120] : [15, 45]) : peak ? [3, 8] : [4, 12];
   const fare = net.fare;
   const busName = net.id === "rojo" ? "el Rojo" : "el Expreso";
   const bus: ModeOption = {
@@ -120,9 +122,10 @@ export function recommend(input: EngineInput): Recommendation | null {
     cost: [fare, fare],
     kcal: 0,
     congestion: net.electric ? "Baja" : peak ? "Media" : "Baja",
-    note: input.nextBusMin !== null ? `Próximo bus en ${input.nextBusMin} min`
-      : net.live ? "Espera estimada según la hora"
-      : `${net.electric ? "Eléctrico. " : ""}Espera estimada: aún sin datos en vivo.`,
+    note: noMore ? "No quedan salidas hoy en esta ruta."
+      : eta ? `${net.electric ? "Eléctrico. " : ""}${eta.source === "live" ? "Próximo bus en" : "Próxima salida programada en"} ${eta.minutes} min`
+      : net.id === "esi" ? "Eléctrico. Pasa cada 40–90 min: espera estimada."
+      : "Espera estimada según la hora",
   };
 
   // Taxi (referencial)
@@ -233,6 +236,6 @@ export function recommend(input: EngineInput): Recommendation | null {
     },
     quote: quotes[input.goal][input.now.getDate() % quotes[input.goal].length],
     path: trip.stopIds.map((id) => ({ lat: stops[id].lat, lng: stops[id].lng, name: stops[id].place })),
-    live: input.nextBusMin !== null,
+    live: !!eta && eta.source === "live",
   };
 }

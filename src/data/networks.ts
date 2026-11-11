@@ -4,7 +4,7 @@
  * - Corredor Rojo (ATU): app.corredorrojo.pe (ubicATUbus), snapshot 10 nov 2026.
  *   272 paraderos, rutas 201/204/206/209 en ida y vuelta. Llegadas en vivo vía rojo-arrivals.
  * - Expreso San Isidro (Municipalidad de San Isidro): zenbus.net, snapshot 11 nov 2026.
- *   76 paraderos, 3 rutas circulares. Gratuito y eléctrico. Sin llegadas en vivo aún.
+ *   76 paraderos, 3 rutas circulares. Gratuito y eléctrico. Llegadas en vivo vía esi-arrivals.
  *
  * Azul y Morado: sin coordenadas públicas todavía (ver bus-routes.ts y portal ATU).
  */
@@ -23,6 +23,7 @@ export type Route = {
   ids: string[];
   loop: boolean; // rutas circulares: se puede seguir pasando el punto de inicio
   primary: boolean; // se usa para agrupar el selector "Desde"
+  liveId?: string; // id de la ruta en la fuente en vivo (Zenbus itinerary)
 };
 
 export type Network = {
@@ -37,7 +38,7 @@ export type Network = {
   routes: Route[];
 };
 
-export type Trip = { route: Route; stopIds: string[] };
+export type Trip = { route: Route; stopIds: string[]; fromIndex: number };
 export type PlaceGroup = { label: string; places: string[] };
 
 /* ───────── Limpieza de nombres ───────── */
@@ -130,6 +131,7 @@ const esiRoutes: Route[] = esiRaw.itineraries.map((it, i) => {
     ids,
     loop: true,
     primary: !sameLineBefore,
+    liveId: it.id,
   };
 });
 
@@ -139,7 +141,7 @@ export const ESI: Network = {
   short: "Expreso SI",
   fare: 0,
   electric: true,
-  live: false,
+  live: true,
   source: "https://zenbus.net/publicapp/limasanisidromibus77868410",
   stops: buildStops(esiRaw.stops as unknown as Record<string, [string, number, number]>, esiPlace),
   routes: esiRoutes,
@@ -197,7 +199,7 @@ export function findTrip(net: Network, from: string, to: string): Trip | null {
     const j = seq.findIndex((id, k) => k > 0 && placeOf(net, id) === to);
     if (j < 0) continue;
     const seg = seq.slice(0, j + 1);
-    if (!best || seg.length < best.stopIds.length) best = { route: r, stopIds: seg };
+    if (!best || seg.length < best.stopIds.length) best = { route: r, stopIds: seg, fromIndex: i };
   }
   return best;
 }

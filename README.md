@@ -13,7 +13,7 @@ Fase 1: uso personal y con amigos. Corredores: Corredor Rojo y Expreso San Isidr
 - Bici y scooter propios como opciones; app instalable con modo offline.
 - Recomendación caminar vs. bus con reglas transparentes (ver `src/lib/engine.ts`). El taxi se usa solo como referencia de ahorro.
 - Clima y calidad del aire en vivo (Open-Meteo).
-- Llegadas del bus en vivo vía intermediario (`supabase/functions/rojo-arrivals`); si no responde, usa espera estimada.
+- Llegadas del bus en vivo vía intermediarios (`supabase/functions/rojo-arrivals` y `esi-arrivals`); si no responden, usa espera estimada.
 - Mapa del tramo (Leaflet + OpenStreetMap).
 - Login sin contraseña (link al correo) y "Mis ahorros" en la nube con Supabase. Sin sesión, se guarda en el dispositivo.
 
@@ -35,7 +35,8 @@ Cada push a `main` se publica solo en GitHub Pages (`.github/workflows/deploy.ym
 | Paraderos y rutas del Expreso San Isidro | Zenbus (Municipalidad de San Isidro), snapshot 11 nov 2026 | `src/data/esi.json`, `src/data/networks.ts` |
 | Corredores Azul y Morado (aún sin uso: faltan coordenadas) | Webs oficiales y portal QR de la ATU | `src/data/bus-routes.ts` |
 | Clima y aire | Open-Meteo (gratis, no comercial) | `src/lib/live.ts` |
-| Llegadas en vivo | API del Rojo vía Edge Function | `supabase/functions/rojo-arrivals` |
+| Llegadas en vivo · Rojo | API del Rojo vía Edge Function | `supabase/functions/rojo-arrivals` |
+| Llegadas en vivo · Expreso | Zenbus (protobuf) vía Edge Function, con horario programado de respaldo | `supabase/functions/esi-arrivals` |
 
 El API del Rojo y los datos de Zenbus no son públicos para terceros: el uso en Fase 1 es moderado y personal. Antes de cualquier uso comercial, pedir permiso a la ATU/operador y a la Municipalidad de San Isidro.
 

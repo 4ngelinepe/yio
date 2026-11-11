@@ -3,10 +3,12 @@
  * - Clima y aire: Open-Meteo (gratis, sin llave, uso no comercial).
  * - Llegadas del Corredor Rojo: el API no permite llamadas desde otros sitios (CORS),
  *   así que pasa por un intermediario: la Edge Function supabase/functions/rojo-arrivals.
- *   Si no responde, YIO usa frecuencias estimadas.
+ * - Llegadas del Expreso San Isidro: Zenbus (protobuf), vía supabase/functions/esi-arrivals.
+ *   Si no responden, YIO usa frecuencias estimadas.
  */
 import type { IconName } from "../data/content";
-import { ARRIVALS_URL } from "./supabase";
+import { ARRIVALS_URL, ESI_ARRIVALS_URL } from "./supabase";
+import type { Network, Trip } from "../data/networks";
 
 export type Weather = { temp: number; code: number; label: string; icon: IconName; rainy: boolean };
 export type Air = { usAqi: number; pm25: number };
@@ -70,6 +72,27 @@ export async function getNextBusMinutes(stopId: string, routeCode: string): Prom
       .filter((m) => m >= 0)
       .sort((a, b) => a - b)[0];
     return next === undefined ? null : Math.round(next);
+  } catch {
+    return null;
+  }
+}
+
+/** Próximo bus para el tramo elegido. `none` = no quedan salidas hoy en esa ruta. */
+export type BusEta = { minutes: number; source: "live" | "schedule" } | { none: true } | null;
+
+export async function getBusEta(net: Network, trip: Trip): Promise<BusEta> {
+  if (!net.live) return null;
+  if (net.id === "rojo") {
+    const m = await getNextBusMinutes(trip.stopIds[0], trip.route.code);
+    return m === null ? null : { minutes: m, source: "live" };
+  }
+  if (!trip.route.liveId) return null;
+  try {
+    const d = (await getJson(`${ESI_ARRIVALS_URL}?itinerary=${trip.route.liveId}&index=${trip.fromIndex}`, 6000)) as {
+      minutes: number | null; source?: "live" | "schedule"; reason?: string;
+    };
+    if (d.minutes !== null && d.source) return { minutes: d.minutes, source: d.source };
+    return d.reason === "sin-salidas" ? { none: true } : null;
   } catch {
     return null;
   }
