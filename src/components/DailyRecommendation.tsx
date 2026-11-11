@@ -135,7 +135,11 @@ export function DailyRecommendation(p: Props) {
                 )}
               >
                 {n.name}
-                {n.fare === 0 && <span className={cx("ml-1.5 text-xs", active ? "opacity-80" : "text-success-text")}>· gratis</span>}
+                {(n.fare === 0 || (n.electric && n.kind === "bus")) && (
+                  <span className={cx("ml-1.5 text-xs", active ? "opacity-80" : "text-success-text")}>
+                    · {[n.fare === 0 ? "gratis" : null, n.electric && n.kind === "bus" ? "eléctrico" : null].filter(Boolean).join(" · ")}
+                  </span>
+                )}
               </button>
             );
           })}
