@@ -12,8 +12,10 @@ const cssVar = (name: string) =>
 
 type BikeState = "off" | "loading" | "on" | "error";
 
-export function MapSection({ route, path, theme }: {
+export function MapSection({ route, path, theme, autoBikes = false }: {
   route: Recommendation["route"]; path: Recommendation["path"]; theme: string;
+  /** Muestra las ciclovías de entrada (cuando el usuario tiene bici/scooter o se recomienda). */
+  autoBikes?: boolean;
 }) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -49,14 +51,18 @@ export function MapSection({ route, path, theme }: {
   }, [path, theme]);
 
   const toggleBikes = async () => {
-    const map = mapRef.current;
-    if (!map) return;
     if (bikes === "on") {
       bikeLayer.current?.remove();
       bikeLayer.current = null;
       setBikes("off");
       return;
     }
+    await loadBikes();
+  };
+
+  const loadBikes = async () => {
+    const map = mapRef.current;
+    if (!map || bikeLayer.current) return;
     setBikes("loading");
     const lats = path.map((p) => p.lat);
     const lngs = path.map((p) => p.lng);
@@ -88,6 +94,12 @@ export function MapSection({ route, path, theme }: {
     setBikeCount({ lanes: laneCount, parking: parking?.features.length ?? 0 });
     setBikes("on");
   };
+
+  // Ciclovías visibles de entrada si van en bici o scooter.
+  useEffect(() => {
+    if (autoBikes && mapRef.current) void loadBikes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, theme, autoBikes]);
 
   return (
     <Card id="mapa" className="overflow-hidden scroll-mt-24" labelledBy="map-title">

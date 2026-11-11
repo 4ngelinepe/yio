@@ -4,6 +4,7 @@ import { goals, type GoalId } from "../data/content";
 import type { Network, NetworkId, PlaceGroup } from "../data/networks";
 import type { Air, Weather } from "../lib/live";
 import { cx } from "../lib/tones";
+import { aqiLabel, isPeak, PEAK_LABEL } from "../lib/engine";
 import { Icon } from "./ui/Icon";
 import { Button, Card } from "./ui/primitives";
 
@@ -84,7 +85,7 @@ export function DailyRecommendation(p: Props) {
         {p.weather ? (
           <>
             <span>· {p.weather.temp}°C · {p.weather.label}</span>
-            {p.air && <span>· Aire AQI {p.air.usAqi}</span>}
+            {p.air && <span title={`Índice de calidad del aire: ${p.air.usAqi}`}>· Aire {aqiLabel(p.air.usAqi)}</span>}
           </>
         ) : (
           <span>· {p.liveLoading ? "cargando clima…" : "sin datos de clima ahora"}</span>
@@ -140,6 +141,15 @@ export function DailyRecommendation(p: Props) {
           })}
           <span className="rounded-full border border-dashed border-line px-4 py-2 text-sm text-subtle">Azul y Morado · pronto</span>
         </div>
+        {(() => {
+          const peak = isPeak(new Date());
+          return (
+            <p className={cx("-mt-1 mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs", peak ? "bg-warning-soft text-warning-text" : "bg-surface-muted text-muted")}>
+              <Icon name="traffic" className="size-4" />
+              {peak ? `Hora punta ahora: más tráfico y buses llenos (${PEAK_LABEL})` : `Fuera de hora punta · la hora punta es ${PEAK_LABEL}`}
+            </p>
+          );
+        })()}
         <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <StopSelect id="from" label="Desde" value={p.from} groups={p.fromGroups} placeholder="Elige tu paradero" onChange={p.onFrom} />
           <ArrowDown className="mx-auto mb-3 size-5 text-subtle sm:-rotate-90" aria-hidden />

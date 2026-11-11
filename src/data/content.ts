@@ -35,6 +35,8 @@ export type ModeOption = {
   kcal: number;
   congestion: "Cero" | "Baja" | "Media" | "Alta";
   note?: string;
+  /** Beneficios destacados de esta opción: "Ahorras S/ 2.43", "8 min menos que caminando". */
+  perks?: string[];
 };
 
 export type Stat = { label: string; value: string; icon: IconName; tone: Tone };

@@ -43,10 +43,20 @@ export const soles = (n: number) => `S/ ${n.toFixed(2)}`;
 export const solesRange = (r: Range) => (r[0] === r[1] ? soles(r[0]) : `${soles(r[0])} – ${soles(r[1])}`);
 export const minRange = (r: Range) => (r[0] === r[1] ? `${r[0]} min` : `${r[0]}–${r[1]} min`);
 
+/** Hora punta en Lima (lun–vie 7–10 y 17–20), siempre en hora de Lima aunque el teléfono esté en otra zona. */
+export const PEAK_LABEL = "lun–vie 7–10 a. m. y 5–8 p. m.";
 export function isPeak(d: Date): boolean {
-  const day = d.getDay();
-  const h = d.getHours();
-  return day >= 1 && day <= 5 && ((h >= 7 && h < 10) || (h >= 17 && h < 20));
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/Lima", weekday: "short", hour: "numeric", hour12: false })
+      .formatToParts(d).map((x) => [x.type, x.value]),
+  );
+  const h = Number(parts.hour) % 24;
+  return !["Sat", "Sun"].includes(parts.weekday) && ((h >= 7 && h < 10) || (h >= 17 && h < 20));
+}
+
+/** El número AQI no le dice nada a la gente: lo traducimos a palabras. */
+export function aqiLabel(aqi: number): string {
+  return aqi <= 50 ? "bueno" : aqi <= 100 ? "aceptable" : aqi <= 150 ? "regular" : aqi <= 200 ? "malo" : "muy malo";
 }
 
 function airStatus(air: Air | null, weather: Weather | null): { level: StatusLevel; reason: string; unknown?: boolean } {
@@ -55,7 +65,7 @@ function airStatus(air: Air | null, weather: Weather | null): { level: StatusLev
   const parts: string[] = [];
   if (air) {
     level = air.usAqi <= 100 ? 1 : air.usAqi <= 150 ? 2 : 3;
-    parts.push(`Calidad del aire ${air.usAqi <= 50 ? "buena" : air.usAqi <= 100 ? "aceptable" : air.usAqi <= 150 ? "regular" : "mala"} (AQI ${air.usAqi})`);
+    parts.push(`Aire ${aqiLabel(air.usAqi)}`);
   } else {
     parts.push("Sin dato de aire ahora");
   }
@@ -162,6 +172,18 @@ export function recommend(input: EngineInput): Recommendation | null {
     kcal: 0,
     congestion: peak ? "Alta" : "Media",
   };
+
+  // Beneficios por opción (lo que ganas frente al bus y al taxi)
+  const vsBus = fare > 0 ? `Ahorras ${soles(fare)} del pasaje` : null;
+  const vsTaxi = `Hasta ${soles(taxi.cost[1])} menos que un taxi`;
+  const fasterThanWalk = (o: ModeOption) => {
+    const d = Math.round(mid(walk.minutes) - mid(o.minutes));
+    return d >= 2 ? `${d} min menos que caminando` : null;
+  };
+  walk.perks = [vsBus, vsTaxi, `Quemas ≈ ${walk.kcal} kcal`].filter(Boolean) as string[];
+  bike.perks = [vsBus, vsTaxi, fasterThanWalk(bike), `Quemas ≈ ${bike.kcal} kcal`].filter(Boolean) as string[];
+  scooter.perks = [vsBus, vsTaxi, fasterThanWalk(scooter), "No quema calorías: es eléctrico"].filter(Boolean) as string[];
+  bus.perks = [`${solesRange([Math.max(0, taxi.cost[0] - fare), Math.max(0, taxi.cost[1] - fare)])} menos que un taxi`, peak && net.kind === "bus" ? "Hora punta: más tráfico y buses llenos" : null].filter(Boolean) as string[];
 
   // Decisión
   const status = airStatus(input.air, input.weather);

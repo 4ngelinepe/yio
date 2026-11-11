@@ -1,4 +1,4 @@
-import { BadgeCheck } from "lucide-react";
+import { BadgeCheck, Check } from "lucide-react";
 import type { ModeOption, Recommendation } from "../data/content";
 import { minRange, solesRange } from "../lib/engine";
 import { cx } from "../lib/tones";
@@ -10,7 +10,7 @@ function Option({ o, recommended }: { o: ModeOption; recommended: boolean }) {
     { label: "Duración", value: minRange(o.minutes), icon: "clock" as const },
     { label: "Costo", value: o.cost[1] === 0 ? "S/ 0.00" : solesRange(o.cost), icon: "dollar" as const },
     { label: "Congestión generada", value: o.congestion, icon: "alert" as const, warn: o.congestion === "Alta" },
-    { label: "Calorías", value: `${o.kcal} kcal`, icon: "flame" as const },
+    { label: "Calorías", value: o.id === "scooter" ? "0 kcal (eléctrico)" : `${o.kcal} kcal`, icon: "flame" as const },
   ];
   return (
     <article
@@ -31,6 +31,16 @@ function Option({ o, recommended }: { o: ModeOption; recommended: boolean }) {
           <p className={recommended ? "text-success-text opacity-80" : "text-muted"}>{o.subtitle}</p>
         </div>
       </header>
+      {o.perks && o.perks.length > 0 && (
+        <ul className="mt-4 space-y-1.5 text-sm">
+          {o.perks.map((t) => (
+            <li key={t} className={cx("flex gap-2", recommended ? "text-success-text" : "text-ink")}>
+              <Check className={cx("mt-0.5 size-4 shrink-0", recommended ? "text-success" : "text-primary")} aria-hidden />
+              {t}
+            </li>
+          ))}
+        </ul>
+      )}
       <dl className="mt-6 space-y-4">
         {rows.map((r) => (
           <div key={r.label} className="flex gap-4">
