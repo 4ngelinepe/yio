@@ -107,6 +107,45 @@ export function destinationsFrom(from: string): string[] {
   return [...set].sort((a, b) => a.localeCompare(b, "es"));
 }
 
+export type PlaceGroup = { label: string; places: string[] };
+
+const dedupe = (ids: string[]) => [...new Set(ids.map((id) => stops[id]?.place).filter(Boolean) as string[])];
+const ROUTE_ORDER = ["201", "204", "206", "209"];
+
+/** "Desde": paraderos agrupados por ruta, en el orden en que pasa el bus (sentido ida). */
+export const placeGroups: PlaceGroup[] = ROUTE_ORDER.map((code) => {
+  const ids = routes[`${code}|IDA`] ?? [];
+  const list = dedupe(ids);
+  return { label: `Ruta ${code} · ${list[0]} → ${list[list.length - 1]}`, places: list };
+});
+
+/** "Hasta": destinos directos desde `from`, agrupados por ruta y sentido, en orden de recorrido. */
+export function destinationGroups(from: string): PlaceGroup[] {
+  const groups: PlaceGroup[] = [];
+  for (const code of ROUTE_ORDER) {
+    for (const dir of ["IDA", "VUELTA"]) {
+      const ids = routes[`${code}|${dir}`] ?? [];
+      const i = ids.findIndex((id) => stops[id]?.place === from);
+      if (i < 0) continue;
+      const after = dedupe(ids.slice(i + 1)).filter((p) => p !== from);
+      if (!after.length) continue;
+      const end = dedupe(ids).at(-1);
+      groups.push({ label: `Ruta ${code} · hacia ${end}`, places: after });
+    }
+  }
+  return groups;
+}
+
+/** Lugar con paradero más cercano a una coordenada, y su distancia en metros. */
+export function nearestPlace(lat: number, lng: number): { place: string; meters: number } {
+  let best = { place: "", meters: Infinity };
+  for (const s of Object.values(stops)) {
+    const d = distanceM({ lat, lng }, s);
+    if (d < best.meters) best = { place: s.place, meters: d };
+  }
+  return best;
+}
+
 /** Distancia en metros entre dos puntos (haversine). */
 export function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
   const R = 6371000;

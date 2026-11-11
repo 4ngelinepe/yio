@@ -52,7 +52,7 @@ export function DirectComparison({ data }: { data: Recommendation }) {
   return (
     <Card className="p-6 sm:p-10" labelledBy="compare-title">
       <h2 id="compare-title" className="text-xl text-ink">Comparación directa</h2>
-      <div className="mt-8 grid gap-8 lg:grid-cols-3 lg:gap-5">
+      <div className="mt-8 grid gap-8 md:grid-cols-2 xl:grid-cols-4 xl:gap-5">
         {ordered.map((o) => <Option key={o.id} o={o} recommended={o.id === data.recommended} />)}
       </div>
       <p className="mt-6 text-sm text-subtle">

@@ -81,6 +81,6 @@ export function monthSummary(list: SavedTrip[], now = new Date()) {
     trips: month.length,
     amount: month.reduce((s, t) => s + t.amount, 0),
     kcal: month.reduce((s, t) => s + t.kcal, 0),
-    walks: month.filter((t) => t.mode === "walk").length,
+    walks: month.filter((t) => t.mode === "walk" || t.mode === "bike").length,
   };
 }

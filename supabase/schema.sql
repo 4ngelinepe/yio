@@ -10,7 +10,7 @@ create table if not exists public.savings (
   trip_at    timestamptz not null,
   from_place text not null check (char_length(from_place) <= 80),
   to_place   text not null check (char_length(to_place) <= 80),
-  mode       text not null check (mode in ('walk', 'bus')),
+  mode       text not null check (mode in ('walk', 'bike', 'bus')),
   amount     numeric(8, 2) not null check (amount >= 0 and amount <= 500),
   kcal       integer not null default 0 check (kcal >= 0 and kcal <= 5000)
 );
@@ -33,3 +33,7 @@ create policy "borrar mis ahorros" on public.savings
   for delete to authenticated using (user_id = (select auth.uid()));
 
 -- Sin política de update a propósito: un ahorro guardado no se edita.
+
+-- Migración (11 nov 2026): permitir ahorros en bici en tablas ya creadas
+alter table public.savings drop constraint if exists savings_mode_check;
+alter table public.savings add constraint savings_mode_check check (mode in ('walk', 'bike', 'bus'));

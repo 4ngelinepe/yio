@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { brand, themes, type ThemeName } from "./config/brand";
 import type { GoalId, Recommendation } from "./data/content";
-import { destinationsFrom, findTrip, places } from "./data/rojo";
+import { destinationGroups, findTrip, nearestPlace, placeGroups } from "./data/rojo";
 import { recommend } from "./lib/engine";
 import { getAir, getNextBusMinutes, getWeather, type Air, type Weather } from "./lib/live";
 import { addRemote, clearRemote, loadLocal, loadRemote, storeLocal, type SavedTrip } from "./lib/savings";
@@ -11,7 +11,7 @@ import { Header } from "./components/Header";
 import { DailyRecommendation } from "./components/DailyRecommendation";
 import { CorridorStatus } from "./components/CorridorStatus";
 import { MapSection } from "./components/MapSection";
-import { RouteSummary } from "./components/RouteSummary";
+import { RouteSummary, type SaveState } from "./components/RouteSummary";
 import { DirectComparison } from "./components/DirectComparison";
 import { CumulativeImpact } from "./components/CumulativeImpact";
 import { InspirationalQuote } from "./components/InspirationalQuote";
@@ -34,8 +34,10 @@ function initialTheme(): ThemeName {
 export default function App() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme);
   const [goal, setGoal] = useState<GoalId>("ahorro");
-  const [from, setFrom] = useState("Arenales");
-  const [to, setTo] = useState("Salaverry");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [hasBike, setHasBike] = useState<boolean>(() => { try { return localStorage.getItem("yio.hasBike") === "1"; } catch { return false; } });
+  const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
   const [weather, setWeather] = useState<Weather | null>(null);
   const [air, setAir] = useState<Air | null>(null);
   const [liveLoading, setLiveLoading] = useState(true);
@@ -47,7 +49,7 @@ export default function App() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  const destinations = useMemo(() => destinationsFrom(from), [from]);
+  const toGroups = useMemo(() => (from ? destinationGroups(from) : []), [from]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -85,26 +87,42 @@ export default function App() {
 
   useEffect(() => { if (!email) storeLocal(saved); }, [saved, email]);
 
+  useEffect(() => { try { localStorage.setItem("yio.hasBike", hasBike ? "1" : "0"); } catch { /* noop */ } }, [hasBike]);
+
   const changeFrom = (v: string) => {
     setFrom(v);
-    const next = destinationsFrom(v);
-    if (!next.includes(to)) setTo(next[0] ?? "");
+    const next = destinationGroups(v).flatMap((g) => g.places);
+    if (!next.includes(to)) setTo("");
   };
+
+  const locate = () =>
+    new Promise<string | null>((resolve) => {
+      if (!navigator.geolocation) return resolve("Tu navegador no permite ubicarte.");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { place, meters } = nearestPlace(pos.coords.latitude, pos.coords.longitude);
+          if (meters > 3000) return resolve("No hay paraderos del Corredor Rojo cerca de ti (a más de 3 km).");
+          changeFrom(place);
+          resolve(`Paradero más cercano: ${place}, a unos ${Math.round(meters / 10) * 10} m.`);
+        },
+        () => resolve("No pudimos ver tu ubicación. Revisa el permiso del navegador."),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+      );
+    });
 
   const calculate = async () => {
     setLoading(true);
     const trip = findTrip(from, to);
     const nextBusMin = trip ? await getNextBusMinutes(trip.stopIds[0], trip.routeKey.split("|")[0]) : null;
-    const r = recommend({ from, to, goal, now: new Date(), weather, air, nextBusMin });
+    const r = recommend({ from, to, goal, now: new Date(), weather, air, nextBusMin, hasBike });
     setResult(r);
+    setSaveState({ kind: "idle" });
     setLoading(false);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
 
-  const isSaved = !!result && saved.some((t) => t.date === result.createdAt);
-
   const save = async () => {
-    if (!result || isSaved) return;
+    if (!result || saveState.kind === "saving" || saveState.kind === "saved") return;
     const rec = result.options.find((o) => o.id === result.recommended)!;
     const trip: SavedTrip = {
       id: result.createdAt,
@@ -115,13 +133,20 @@ export default function App() {
       amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
       kcal: rec.kcal,
     };
-    if (!email) { setSaved((list) => [trip, ...list]); return; }
+    if (!email) {
+      setSaved((list) => [trip, ...list]);
+      setSaveState({ kind: "saved", cloud: false });
+      return;
+    }
+    setSaveState({ kind: "saving" });
     try {
       const [stored] = await addRemote([trip]);
       setSaved((list) => [stored, ...list]);
       setSyncError(null);
-    } catch {
-      setSyncError("No se pudo guardar en la nube. Intenta de nuevo.");
+      setSaveState({ kind: "saved", cloud: true });
+    } catch (e) {
+      console.error("No se pudo guardar el ahorro", e);
+      setSaveState({ kind: "error", msg: "No se pudo guardar en tu cuenta. Revisa tu conexión e intenta de nuevo." });
     }
   };
 
@@ -141,8 +166,11 @@ export default function App() {
           weather={weather}
           air={air}
           liveLoading={liveLoading}
-          places={places}
-          destinations={destinations}
+          fromGroups={placeGroups}
+          toGroups={toGroups}
+          onLocate={locate}
+          hasBike={hasBike}
+          onHasBike={setHasBike}
           from={from}
           to={to}
           onFrom={changeFrom}
@@ -156,7 +184,7 @@ export default function App() {
         {result && (
           <div ref={resultsRef} className="scroll-mt-24 space-y-10">
             <CorridorStatus status={result.status} />
-            <RouteSummary data={result} saved={isSaved} onSave={save} />
+            <RouteSummary data={result} save={saveState} onSave={save} />
             <MapSection route={result.route} path={result.path} theme={theme} />
             <DirectComparison data={result} />
             <CumulativeImpact data={result.impact} />

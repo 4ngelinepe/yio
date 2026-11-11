@@ -26,7 +26,7 @@ export function MySavings({ list, onClear, loggedIn, onLogin, error }: {
           <p className="mt-1 text-sm text-muted">Este mes</p>
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <StatTile label="Ahorrado" value={soles(m.amount)} icon="dollar" tone="success" />
-            <StatTile label="Tramos guardados" value={`${m.trips} (${m.walks} caminando)`} icon="footprints" tone="info" />
+            <StatTile label="Tramos guardados" value={`${m.trips} (${m.walks} a pie o en bici)`} icon="footprints" tone="info" />
             <StatTile label="Energía" value={`${m.kcal.toLocaleString("es-PE")} kcal`} icon="flame" tone="energy" />
           </div>
 
@@ -35,7 +35,7 @@ export function MySavings({ list, onClear, loggedIn, onLogin, error }: {
               <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                 <span className="flex items-center gap-2 text-ink">
                   {t.from} <ArrowRight className="size-3.5 text-muted" /> {t.to}
-                  <span className="text-muted">· {t.mode === "walk" ? "caminando" : "en bus"}</span>
+                  <span className="text-muted">· {t.mode === "walk" ? "caminando" : t.mode === "bike" ? "en bici" : "en bus"}</span>
                 </span>
                 <span className="text-muted">{fmtDate(t.date)} · <span className="text-success-text">{soles(t.amount)}</span></span>
               </li>
