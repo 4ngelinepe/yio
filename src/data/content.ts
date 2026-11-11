@@ -5,7 +5,7 @@ import type { Tone } from "../lib/tones";
 
 export type GoalId = "rapido" | "ahorro" | "trafico" | "bienestar";
 export type IconName =
-  | "zap" | "piggy" | "traffic" | "sparkles" | "clock" | "dollar" | "car" | "bus" | "bike"
+  | "zap" | "piggy" | "traffic" | "sparkles" | "clock" | "dollar" | "car" | "bus" | "bike" | "scooter"
   | "alert" | "flame" | "footprints" | "wind" | "sun" | "cloud" | "rain" | "trend";
 
 export const goals: { id: GoalId; label: string; icon: IconName }[] = [
@@ -23,7 +23,7 @@ export const statusLevels: Record<StatusLevel, { label: string; tone: Tone }> = 
 };
 
 export type Range = [number, number];
-export type ModeId = "walk" | "bike" | "bus" | "taxi";
+export type ModeId = "walk" | "bike" | "scooter" | "bus" | "taxi";
 
 export type ModeOption = {
   id: ModeId;
@@ -41,7 +41,7 @@ export type Stat = { label: string; value: string; icon: IconName; tone: Tone };
 
 export type Recommendation = {
   createdAt: string;
-  status: { level: StatusLevel; reason: string };
+  status: { level: StatusLevel; reason: string; unknown?: boolean };
   route: { from: string; via: string; to: string; note: string; routeLabel: string };
   options: ModeOption[];
   recommended: ModeId;

@@ -8,6 +8,7 @@ const headline = (r: Recommendation) => {
   const rec = r.options.find((o) => o.id === r.recommended)!;
   if (rec.id === "walk") return "camina";
   if (rec.id === "bike") return "ve en bici";
+  if (rec.id === "scooter") return "ve en scooter";
   return `toma el ${rec.title}`;
 };
 
@@ -25,6 +26,7 @@ export function RouteSummary({ data, save, onSave }: {
       </h2>
       <p className="mt-4 text-2xl font-medium text-ink">Recomendación: {headline(data)}</p>
       <p className="mt-1 text-muted">{data.why}</p>
+      <p className="mt-3 border-l-2 border-primary pl-3 text-sm italic text-ink">{data.quote}</p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
         {data.today.map((s) => <StatTile key={s.label} {...s} />)}

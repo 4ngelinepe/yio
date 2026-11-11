@@ -6,6 +6,7 @@
  *  - Caminar: 4.8 km/h (80 m/min); la calle real es ~20% más larga que la línea recta.
  *  - YIO nunca recomienda taxi: es la referencia para medir el ahorro.
  *  - Bici: 14 km/h promedio; misma distancia que caminando. Solo se recomienda si el usuario tiene bici.
+ *  - Scooter eléctrico: 16 km/h; ahorra y no congestiona, pero no suma calorías. Solo si el usuario tiene uno.
  *  - Bus Rojo: 11 km/h en hora punta, 17 km/h fuera; espera 3–8 min (punta) o 4–12 min.
  *  - Taxi: 14 km/h en punta, 24 km/h fuera; tarifa de referencia, no oficial.
  *  - Hora punta: lun–vie 7–10 am y 5–8 pm.
@@ -26,6 +27,7 @@ export type EngineInput = {
   air: Air | null;
   nextBusMin: number | null;
   hasBike: boolean;
+  hasScooter: boolean;
 };
 
 const round = (n: number) => Math.max(1, Math.round(n));
@@ -41,7 +43,8 @@ export function isPeak(d: Date): boolean {
   return day >= 1 && day <= 5 && ((h >= 7 && h < 10) || (h >= 17 && h < 20));
 }
 
-function airStatus(air: Air | null, weather: Weather | null): { level: StatusLevel; reason: string } {
+function airStatus(air: Air | null, weather: Weather | null): { level: StatusLevel; reason: string; unknown?: boolean } {
+  if (!air && !weather) return { level: 1, reason: "Sin conexión o sin datos en vivo: la recomendación usa tiempos estimados.", unknown: true };
   let level: StatusLevel = 1;
   const parts: string[] = [];
   if (air) {
@@ -86,6 +89,17 @@ export function recommend(input: EngineInput): Recommendation | null {
     note: "Revisa las ciclovías del tramo en el mapa.",
   };
 
+  // Scooter eléctrico (propio)
+  const scooterMin = (walkM / 1000 / 16) * 60;
+  const scooter: ModeOption = {
+    id: "scooter", title: "Ir en scooter", subtitle: input.hasScooter ? "Con tu scooter" : "Si tienes scooter a la mano", icon: "scooter",
+    minutes: [round(scooterMin * 0.9 + 2), round(scooterMin * 1.2 + 4)],
+    cost: [0, 0],
+    kcal: 0,
+    congestion: "Cero",
+    note: "Eléctrico: no congestiona ni contamina. Usa ciclovía donde haya.",
+  };
+
   // Bus Rojo
   const rideKm = (rideDistanceM(trip) * 1.05) / 1000;
   const rideMin = (rideKm / (peak ? 11 : 17)) * 60;
@@ -113,7 +127,9 @@ export function recommend(input: EngineInput): Recommendation | null {
   const status = airStatus(input.air, input.weather);
   const walkOk = status.level < 3 && mid(walk.minutes) <= 60;
   const bikeOk = input.hasBike && status.level < 3 && !input.weather?.rainy && mid(bike.minutes) <= 60;
-  const fastest = [walkOk ? walk : null, bikeOk ? bike : null, bus]
+  const scooterOk = input.hasScooter && status.level < 3 && !input.weather?.rainy && mid(scooter.minutes) <= 60;
+  const sm = mid(scooter.minutes);
+  const fastest = [walkOk ? walk : null, bikeOk ? bike : null, scooterOk ? scooter : null, bus]
     .filter((o): o is ModeOption => !!o)
     .sort((a, b) => mid(a.minutes) - mid(b.minutes))[0];
   const bm = mid(bike.minutes);
@@ -123,32 +139,36 @@ export function recommend(input: EngineInput): Recommendation | null {
   const wm = mid(walk.minutes);
   switch (input.goal) {
     case "rapido":
-      recommended = fastest.id as "walk" | "bike" | "bus";
+      recommended = fastest.id as Exclude<ModeId, "taxi">;
       why = recommended === "walk" ? "Caminando llegas antes que esperando el bus."
         : recommended === "bike" ? "En bici llegas antes que en bus, y sin tráfico."
+        : recommended === "scooter" ? "En scooter llegas antes que en bus y no sumas un auto más."
         : "Para este tramo, el Rojo te deja antes.";
       break;
     case "ahorro":
-      recommended = walkOk && wm <= 25 ? "walk" : bikeOk ? "bike" : walkOk && wm <= 45 ? "walk" : "bus";
+      recommended = walkOk && wm <= 25 ? "walk" : bikeOk ? "bike" : scooterOk ? "scooter" : walkOk && wm <= 45 ? "walk" : "bus";
       why = recommended === "walk" ? "Es un tramo caminable: te ahorras el pasaje completo."
         : recommended === "bike" ? "En bici te ahorras el pasaje y llegas más rápido que caminando."
+        : recommended === "scooter" ? "En scooter te ahorras el pasaje y no congestionas."
         : "El tramo es largo para caminar; el Rojo es la opción más barata.";
       break;
     case "trafico":
-      recommended = bikeOk && bm <= mid(bus.minutes) + 10 ? "bike" : walkOk && wm <= (peak ? 50 : 35) ? "walk" : "bus";
+      recommended = bikeOk && bm <= mid(bus.minutes) + 10 ? "bike" : scooterOk && sm <= mid(bus.minutes) + 10 ? "scooter" : walkOk && wm <= (peak ? 50 : 35) ? "walk" : "bus";
       why = recommended === "bike" ? "En bici esquivas el tráfico y no sumas un auto más."
+        : recommended === "scooter" ? "En scooter esquivas el tráfico y no sumas un auto más."
         : recommended === "walk" ? (peak ? "Es hora punta: caminando no dependes del tráfico." : "Caminando no sumas al tráfico.")
         : "El tramo es largo para caminar; el Rojo evita el taxi en el tráfico.";
       break;
     default:
-      recommended = walkOk && wm <= 60 ? "walk" : bikeOk ? "bike" : "bus";
+      recommended = walkOk && wm <= 60 ? "walk" : bikeOk ? "bike" : scooterOk ? "scooter" : "bus";
       why = recommended === "walk" ? "Moverte te hace bien y el aire lo permite."
         : recommended === "bike" ? "El tramo es largo a pie, pero en bici te mueves igual."
+        : recommended === "scooter" ? "El tramo es largo a pie; en scooter llegas sin tráfico."
         : "Hoy mejor no caminar este tramo completo.";
   }
   if (!walkOk && status.level === 3 && recommended === "bus") why = "La calidad del aire no está para caminar ahora.";
 
-  const rec = recommended === "walk" ? walk : recommended === "bike" ? bike : bus;
+  const rec = { walk, bike, scooter, bus }[recommended];
   const active = recommended !== "bus";
   const savings: Range =
     active ? [ROJO_FARE, taxi.cost[1]]
@@ -164,12 +184,12 @@ export function recommend(input: EngineInput): Recommendation | null {
       from: input.from, via: middle.place, to: input.to, routeLabel: routeLabel(trip.routeKey),
       note: `${trip.stopIds.length - 1} paraderos`,
     },
-    options: [walk, bike, bus, taxi],
+    options: [walk, bike, scooter, bus, taxi],
     recommended,
     why,
     savings,
     today: [
-      { label: recommended === "walk" ? "Duración caminando" : recommended === "bike" ? "Duración en bici" : "Duración del viaje", value: minRange(rec.minutes), icon: "clock", tone: "info" },
+      { label: { walk: "Duración caminando", bike: "Duración en bici", scooter: "Duración en scooter", bus: "Duración del viaje" }[recommended], value: minRange(rec.minutes), icon: "clock", tone: "info" },
       { label: "Ahorro hoy", value: solesRange(savings), icon: "dollar", tone: "success" },
       { label: "Congestión generada", value: rec.congestion, icon: "car", tone: "highlight" },
     ],
@@ -177,11 +197,13 @@ export function recommend(input: EngineInput): Recommendation | null {
       intro: "Si repites esta decisión 20 días/mes:",
       stats: [
         { label: "Ahorro", value: solesRange([Math.round(monthly[0]), Math.round(monthly[1])]).replace(/\.00/g, ""), icon: "dollar", tone: "success" },
-        active
+        active && rec.kcal > 0
           ? { label: "Energía", value: `≈ ${(rec.kcal * 20).toLocaleString("es-PE")} kcal`, icon: "zap", tone: "energy" }
+          : active
+          ? { label: "Viajes sin auto", value: "20 viajes", icon: "scooter", tone: "energy" }
           : { label: "Viajes en transporte público", value: "20 viajes", icon: "bus", tone: "energy" },
         active
-          ? { label: recommended === "bike" ? "Distancia en bici" : "Distancia caminada", value: `≈ ${Math.round(walkKm * 20)} km`, icon: recommended === "bike" ? "bike" : "footprints", tone: "highlight" }
+          ? { label: { walk: "Distancia caminada", bike: "Distancia en bici", scooter: "Distancia en scooter", bus: "" }[recommended], value: `≈ ${Math.round(walkKm * 20)} km`, icon: recommended === "walk" ? "footprints" : recommended === "bike" ? "bike" : "scooter", tone: "highlight" }
           : { label: "Tiempo extra vs. taxi", value: `≈ ${Math.max(0, Math.round(((mid(bus.minutes) - mid(taxi.minutes)) * 20) / 60))} h al mes`, icon: "clock", tone: "highlight" },
       ],
       equivalences: [

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, Bike, Loader2, LocateFixed } from "lucide-react";
+import { ArrowDown, Bike, Loader2, LocateFixed, Scooter } from "lucide-react";
 import { goals, type GoalId } from "../data/content";
 import type { PlaceGroup } from "../data/rojo";
 import type { Air, Weather } from "../lib/live";
@@ -22,6 +22,8 @@ type Props = {
   onGoalChange: (g: GoalId) => void;
   hasBike: boolean;
   onHasBike: (v: boolean) => void;
+  hasScooter: boolean;
+  onHasScooter: (v: boolean) => void;
   onCalculate: () => void;
   loading: boolean;
 };
@@ -66,23 +68,24 @@ export function DailyRecommendation(p: Props) {
 
   return (
     <Card className="p-6 sm:p-10" labelledBy="goal-title">
-      {/* Clima y aire en vivo */}
-      <div className="flex items-center gap-4">
-        <span className="grid size-16 shrink-0 place-items-center rounded-tile bg-energy text-white">
-          {p.liveLoading ? <Loader2 className="size-7 animate-spin" /> : <Icon name={p.weather?.icon ?? "sun"} className="size-8" />}
-        </span>
-        <div className="leading-tight">
-          <p className="text-muted">Lima, Perú</p>
-          <p className="text-xl text-ink">{p.weather ? `${p.weather.temp}°C` : p.liveLoading ? "…" : "Sin datos"}</p>
-          <p className="text-sm text-subtle">
-            {p.weather?.label ?? "Clima no disponible"}
-            {p.air && <> · Aire AQI {p.air.usAqi}</>}
-          </p>
-        </div>
-      </div>
+      {/* Clima y aire en vivo, en una línea */}
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+        {p.liveLoading
+          ? <Loader2 className="size-4 animate-spin text-energy" />
+          : <Icon name={p.weather?.icon ?? "cloud"} className="size-5 text-energy" />}
+        <span className="text-ink">Lima</span>
+        {p.weather ? (
+          <>
+            <span>· {p.weather.temp}°C · {p.weather.label}</span>
+            {p.air && <span>· Aire AQI {p.air.usAqi}</span>}
+          </>
+        ) : (
+          <span>· {p.liveLoading ? "cargando clima…" : "sin datos de clima ahora"}</span>
+        )}
+      </p>
 
       {/* Tramo */}
-      <div className="mt-8">
+      <div className="mt-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg text-ink">¿Qué tramo del Corredor Rojo vas a hacer?</h2>
           <button
@@ -134,14 +137,17 @@ export function DailyRecommendation(p: Props) {
         </div>
       </fieldset>
 
-      <label className="mt-6 inline-flex cursor-pointer items-center gap-3 text-ink">
-        <input
-          type="checkbox" checked={p.hasBike} onChange={(e) => p.onHasBike(e.target.checked)}
-          className="size-5 accent-[var(--primary)]"
-        />
-        <Bike className="size-5 text-muted" />
-        Tengo bici para este tramo
-      </label>
+      <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-ink">
+        <span className="text-sm text-muted">Para este tramo tengo:</span>
+        <label className="inline-flex cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={p.hasBike} onChange={(e) => p.onHasBike(e.target.checked)} className="size-5 accent-[var(--primary)]" />
+          <Bike className="size-5 text-muted" /> Bici
+        </label>
+        <label className="inline-flex cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={p.hasScooter} onChange={(e) => p.onHasScooter(e.target.checked)} className="size-5 accent-[var(--primary)]" />
+          <Scooter className="size-5 text-muted" /> Scooter
+        </label>
+      </div>
 
       <div className="mt-8">
         <Button

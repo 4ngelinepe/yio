@@ -4,7 +4,7 @@ import type { GoalId, Recommendation } from "./data/content";
 import { destinationGroups, findTrip, nearestPlace, placeGroups } from "./data/rojo";
 import { recommend } from "./lib/engine";
 import { getAir, getNextBusMinutes, getWeather, type Air, type Weather } from "./lib/live";
-import { addRemote, clearRemote, loadLocal, loadRemote, storeLocal, type SavedTrip } from "./lib/savings";
+import { addRemote, clearRemote, deleteRemote, loadLocal, loadPending, loadRemote, storeLocal, storePending, type SavedTrip } from "./lib/savings";
 import { supabase } from "./lib/supabase";
 import { LoginPanel } from "./components/LoginPanel";
 import { Header } from "./components/Header";
@@ -14,7 +14,6 @@ import { MapSection } from "./components/MapSection";
 import { RouteSummary, type SaveState } from "./components/RouteSummary";
 import { DirectComparison } from "./components/DirectComparison";
 import { CumulativeImpact } from "./components/CumulativeImpact";
-import { InspirationalQuote } from "./components/InspirationalQuote";
 import { MySavings } from "./components/MySavings";
 import { Footer } from "./components/Footer";
 import { HelpButton, ThemeSwitcher } from "./components/Floating";
@@ -37,6 +36,7 @@ export default function App() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [hasBike, setHasBike] = useState<boolean>(() => { try { return localStorage.getItem("yio.hasBike") === "1"; } catch { return false; } });
+  const [hasScooter, setHasScooter] = useState<boolean>(() => { try { return localStorage.getItem("yio.hasScooter") === "1"; } catch { return false; } });
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
   const [weather, setWeather] = useState<Weather | null>(null);
   const [air, setAir] = useState<Air | null>(null);
@@ -47,6 +47,9 @@ export default function App() {
   const [email, setEmail] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [tappId, setTappId] = useState("");
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const [pending, setPending] = useState<SavedTrip[]>(loadPending);
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const toGroups = useMemo(() => (from ? destinationGroups(from) : []), [from]);
@@ -66,28 +69,48 @@ export default function App() {
 
   // Sesión: al entrar, sube los ahorros locales y carga los de la cuenta.
   useEffect(() => {
-    const onSession = async (userEmail: string | null) => {
+    const onSession = async (userEmail: string | null, meta?: Record<string, unknown>) => {
       setEmail(userEmail);
+      setTappId(typeof meta?.tapp_id === "string" ? meta.tapp_id : "");
       if (!userEmail) { setSaved(loadLocal()); return; }
       try {
         const local = loadLocal();
         if (local.length) { await addRemote(local); storeLocal([]); }
+        await flushPending();
         setSaved(await loadRemote());
         setSyncError(null);
       } catch {
         setSyncError("No se pudieron cargar tus ahorros de la nube. Se muestran los de este dispositivo.");
       }
     };
-    supabase.auth.getSession().then(({ data }) => onSession(data.session?.user.email ?? null));
+    supabase.auth.getSession().then(({ data }) => onSession(data.session?.user.email ?? null, data.session?.user.user_metadata));
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT") onSession(session?.user.email ?? null);
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") onSession(session?.user.email ?? null, session?.user.user_metadata);
     });
     return () => sub.subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Conexión: avisar y subir lo pendiente al volver.
+  useEffect(() => {
+    const up = () => { setOnline(true); if (email) flushPending().then(refreshRemote); };
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    return () => { window.removeEventListener("online", up); window.removeEventListener("offline", down); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
+
+  useEffect(() => { storePending(pending); }, [pending]);
 
   useEffect(() => { if (!email) storeLocal(saved); }, [saved, email]);
 
-  useEffect(() => { try { localStorage.setItem("yio.hasBike", hasBike ? "1" : "0"); } catch { /* noop */ } }, [hasBike]);
+  useEffect(() => {
+    try {
+      localStorage.setItem("yio.hasBike", hasBike ? "1" : "0");
+      localStorage.setItem("yio.hasScooter", hasScooter ? "1" : "0");
+    } catch { /* noop */ }
+  }, [hasBike, hasScooter]);
 
   const changeFrom = (v: string) => {
     setFrom(v);
@@ -114,12 +137,25 @@ export default function App() {
     setLoading(true);
     const trip = findTrip(from, to);
     const nextBusMin = trip ? await getNextBusMinutes(trip.stopIds[0], trip.routeKey.split("|")[0]) : null;
-    const r = recommend({ from, to, goal, now: new Date(), weather, air, nextBusMin, hasBike });
+    const r = recommend({ from, to, goal, now: new Date(), weather, air, nextBusMin, hasBike, hasScooter });
     setResult(r);
     setSaveState({ kind: "idle" });
     setLoading(false);
     requestAnimationFrame(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
+
+  async function flushPending() {
+    const queue = loadPending();
+    if (!queue.length || !navigator.onLine) return;
+    try {
+      await addRemote(queue.map(({ pending: _p, ...t }) => t));
+      setPending([]);
+    } catch { /* se reintenta en la próxima conexión */ }
+  }
+
+  async function refreshRemote() {
+    try { setSaved(await loadRemote()); } catch { /* noop */ }
+  }
 
   const save = async () => {
     if (!result || saveState.kind === "saving" || saveState.kind === "saved") return;
@@ -130,11 +166,17 @@ export default function App() {
       from: result.route.from,
       to: result.route.to,
       mode: result.recommended,
+      route: result.options.find((o) => o.id === "bus")?.title,
       amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
       kcal: rec.kcal,
     };
     if (!email) {
       setSaved((list) => [trip, ...list]);
+      setSaveState({ kind: "saved", cloud: false });
+      return;
+    }
+    if (!navigator.onLine) {
+      setPending((q) => [{ ...trip, pending: true }, ...q]);
       setSaveState({ kind: "saved", cloud: false });
       return;
     }
@@ -150,6 +192,20 @@ export default function App() {
     }
   };
 
+  const deleteOne = async (id: string) => {
+    if (email) {
+      try { await deleteRemote(id); } catch { setSyncError("No se pudo borrar ese tramo."); return; }
+    }
+    setSaved((list) => list.filter((t) => t.id !== id));
+  };
+
+  const saveTappId = async (v: string) => {
+    const { error } = await supabase.auth.updateUser({ data: { tapp_id: v || null } });
+    if (error) return false;
+    setTappId(v);
+    return true;
+  };
+
   const clearAll = async () => {
     if (email) {
       try { await clearRemote(); } catch { setSyncError("No se pudo borrar el historial."); return; }
@@ -161,7 +217,12 @@ export default function App() {
     <div className="min-h-screen bg-bg">
       <Header email={email} onLogin={() => setLoginOpen(true)} onLogout={() => supabase.auth.signOut()} />
 
-      <main className="mx-auto max-w-6xl space-y-10 px-4 py-8 sm:px-6 sm:py-12">
+      {!online && (
+        <p role="status" className="bg-warning-soft px-4 py-2 text-center text-sm text-warning-text">
+          Sin conexión: YIO usa tiempos estimados y guarda tus ahorros para subirlos cuando vuelva la señal.
+        </p>
+      )}
+      <main className="mx-auto max-w-6xl space-y-8 px-4 pb-10 pt-4 sm:px-6 sm:pt-6">
         <DailyRecommendation
           weather={weather}
           air={air}
@@ -171,6 +232,8 @@ export default function App() {
           onLocate={locate}
           hasBike={hasBike}
           onHasBike={setHasBike}
+          hasScooter={hasScooter}
+          onHasScooter={setHasScooter}
           from={from}
           to={to}
           onFrom={changeFrom}
@@ -188,11 +251,19 @@ export default function App() {
             <MapSection route={result.route} path={result.path} theme={theme} />
             <DirectComparison data={result} />
             <CumulativeImpact data={result.impact} />
-            <InspirationalQuote text={result.quote} />
           </div>
         )}
 
-        <MySavings list={saved} onClear={clearAll} loggedIn={!!email} onLogin={() => setLoginOpen(true)} error={syncError} />
+        <MySavings
+          list={[...pending, ...saved]}
+          onClear={clearAll}
+          onDelete={deleteOne}
+          loggedIn={!!email}
+          onLogin={() => setLoginOpen(true)}
+          error={syncError}
+          tappId={tappId}
+          onSaveTappId={saveTappId}
+        />
       </main>
 
       <Footer />

@@ -9,6 +9,15 @@ const TEXT = {
 } as const;
 
 export function CorridorStatus({ status }: { status: Recommendation["status"] }) {
+  if (status.unknown) {
+    return (
+      <section aria-live="polite" className="rounded-card border border-line bg-surface-muted p-6 sm:p-8">
+        <p className="text-sm text-muted">Estado para caminar</p>
+        <p className="font-display text-3xl font-medium uppercase tracking-tight text-muted sm:text-4xl">Sin datos</p>
+        <p className="mt-1 text-sm text-muted">{status.reason}</p>
+      </section>
+    );
+  }
   const s = statusLevels[status.level];
   const t = tones[s.tone];
   return (

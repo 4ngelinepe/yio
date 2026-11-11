@@ -24,14 +24,10 @@ export function Card({
 export function IconTile({
   icon, tone = "info", size = "md",
 }: { icon: IconName; tone?: Tone; size?: "sm" | "md" | "lg" }) {
-  const s = { sm: "size-10 [&>svg]:size-5", md: "size-12 [&>svg]:size-6", lg: "size-16 [&>svg]:size-8" }[size];
+  // Sin fondo: el ícono va en el color del tono para no competir con el logo.
+  const s = { sm: "[&>svg]:size-6", md: "[&>svg]:size-7", lg: "[&>svg]:size-11" }[size];
   return (
-    <span
-      className={cx(
-        "inline-grid shrink-0 place-items-center rounded-tile text-white",
-        tones[tone].solid, s,
-      )}
-    >
+    <span className={cx("inline-grid shrink-0 place-items-center", tones[tone].fg, s)}>
       <Icon name={icon} />
     </span>
   );

@@ -15,16 +15,16 @@ function Option({ o, recommended }: { o: ModeOption; recommended: boolean }) {
   return (
     <article
       className={cx(
-        "relative rounded-card p-6",
+        "relative rounded-card p-5 pt-6",
         recommended ? "border-2 border-success-border bg-success-soft" : "border border-line bg-surface-muted",
       )}
     >
       {recommended && (
-        <span className="absolute -top-4 right-4 inline-flex items-center gap-2 rounded-full bg-success px-4 py-1.5 text-sm text-white shadow-card">
+        <span className="absolute -top-3.5 left-4 inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-success px-3 py-1 text-xs text-white shadow-card">
           <BadgeCheck className="size-4" /> Recomendado hoy
         </span>
       )}
-      <header className="flex items-center gap-4">
+      <header className="flex flex-col items-start gap-2">
         <IconTile icon={o.icon} tone={recommended ? "success" : "neutral"} />
         <div>
           <h3 className={cx("text-lg", recommended ? "text-success-text" : "text-ink")}>{o.title}</h3>
@@ -52,7 +52,7 @@ export function DirectComparison({ data }: { data: Recommendation }) {
   return (
     <Card className="p-6 sm:p-10" labelledBy="compare-title">
       <h2 id="compare-title" className="text-xl text-ink">Comparación directa</h2>
-      <div className="mt-8 grid gap-8 md:grid-cols-2 xl:grid-cols-4 xl:gap-5">
+      <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-5 xl:grid-cols-5 xl:gap-4">
         {ordered.map((o) => <Option key={o.id} o={o} recommended={o.id === data.recommended} />)}
       </div>
       <p className="mt-6 text-sm text-subtle">
