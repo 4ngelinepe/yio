@@ -12,9 +12,9 @@ export const brand = {
   productName: "GEO",
   siteName: "Una idea de Angie Saravia Gigante",
   userName: "Usuario",
-  defaultTheme: "wireframe" as ThemeName,
+  defaultTheme: "geo" as ThemeName,
   /** Muestra el selector de temas flotante. Apagar en producción. */
-  showThemeSwitcher: true,
+  showThemeSwitcher: false,
   /** Imagen de fondo del mapa (en /public). Vacío = placeholder rayado. */
   mapImage: "" as string,
   year: 2026,
