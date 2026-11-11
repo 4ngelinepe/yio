@@ -135,3 +135,31 @@ export function bikeCoverage(path: [number, number][], lanes: Awaited<ReturnType
     segregatedPct: total ? Math.round((seg / total) * 100) : 0,
   };
 }
+
+/** Solo los tramos de ciclovía por donde pasa la ruta (a ≤ maxM metros de ella). path en [lat, lng]. */
+export function nearPath(fc: FeatureCollection, path: [number, number][], maxM = 25): FeatureCollection {
+  const pts: [number, number][] = [];
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i];
+    const len = Math.hypot((b[0] - a[0]) * M_LAT, (b[1] - a[1]) * M_LNG);
+    const n = Math.max(1, Math.round(len / 15));
+    for (let k = 0; k <= n; k++) pts.push([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+  }
+  const touches = (line: number[][]) => {
+    for (let i = 1; i < line.length; i++) {
+      const a: [number, number] = [line[i - 1][1], line[i - 1][0]], b: [number, number] = [line[i][1], line[i][0]];
+      for (const p of pts) if (distToSeg(p, a, b) <= maxM) return true;
+    }
+    return false;
+  };
+  return {
+    ...fc,
+    features: fc.features.filter((f) => {
+      const g = f.geometry;
+      if (g?.type === "LineString") return touches(g.coordinates);
+      if (g?.type === "MultiLineString") return g.coordinates.some(touches);
+      if (g?.type === "Point") return pts.some((p) => Math.hypot((p[0] - g.coordinates[1]) * M_LAT, (p[1] - g.coordinates[0]) * M_LNG) <= 150);
+      return false;
+    }),
+  };
+}

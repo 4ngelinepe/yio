@@ -3,7 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { ArrowRight, Bike, Loader2 } from "lucide-react";
 import type { Recommendation } from "../data/content";
-import { BIKE_SOURCE, getBikeData, type BBox, type BikeCoverage } from "../lib/bikes";
+import { BIKE_SOURCE, getBikeData, nearPath, type BBox, type BikeCoverage } from "../lib/bikes";
 import { coverageText } from "./DirectComparison";
 import { cx } from "../lib/tones";
 import { Card } from "./ui/primitives";
@@ -23,6 +23,8 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
   const mapRef = useRef<L.Map | null>(null);
   const bikeLayer = useRef<L.LayerGroup | null>(null);
   const [bikes, setBikes] = useState<BikeState>("off");
+  // "route": solo las ciclovías por donde pasa tu ruta en bici; "all": todas las de la zona.
+  const [scope, setScope] = useState<"route" | "all">("route");
   const [bikeCount, setBikeCount] = useState({ lanes: 0, parking: 0 });
 
   // Mapa base + tramo
@@ -55,17 +57,24 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
     return () => { map.remove(); mapRef.current = null; bikeLayer.current = null; };
   }, [path, theme, bikePath, autoBikes]);
 
+  const routeMode = autoBikes && !!bikePath && bikePath.length > 1;
+
+  const clearBikes = () => { bikeLayer.current?.remove(); bikeLayer.current = null; };
+
   const toggleBikes = async () => {
-    if (bikes === "on") {
-      bikeLayer.current?.remove();
-      bikeLayer.current = null;
-      setBikes("off");
+    if (routeMode) {
+      // Con ruta en bici: alterna entre "solo mi ruta" y "toda la zona".
+      const next = scope === "route" ? "all" : "route";
+      setScope(next);
+      clearBikes();
+      await loadBikes(next);
       return;
     }
-    await loadBikes();
+    if (bikes === "on") { clearBikes(); setBikes("off"); return; }
+    await loadBikes("all");
   };
 
-  const loadBikes = async () => {
+  const loadBikes = async (mode: "route" | "all" = routeMode ? "route" : "all") => {
     const map = mapRef.current;
     if (!map || bikeLayer.current) return;
     setBikes("loading");
@@ -80,29 +89,33 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
     const color = cssVar("--highlight");
     const group = L.layerGroup();
     let laneCount = 0;
+    const only = mode === "route" && bikePath && bikePath.length > 1 ? bikePath : null;
     lanes.forEach((l) => {
       if (!l.data) return;
-      laneCount += l.data.features.length;
-      L.geoJSON(l.data, {
+      const data = only ? nearPath(l.data, only) : l.data;
+      laneCount += data.features.length;
+      L.geoJSON(data, {
         style: { color, weight: 3, opacity: 0.85, dashArray: l.dash },
         onEachFeature: (f, layer) => layer.bindTooltip(`${l.label}${f.properties?.Nombre_de ? ` · ${f.properties.Nombre_de}` : ""}`),
       }).addTo(group);
     });
-    if (parking) {
-      L.geoJSON(parking, {
+    const park = parking && only ? nearPath(parking, only) : parking;
+    if (park) {
+      L.geoJSON(park, {
         pointToLayer: (_f, latlng) =>
           L.circleMarker(latlng, { radius: 3.5, color, weight: 1.5, fillColor: "#fff", fillOpacity: 1 }).bindTooltip("Cicloparqueadero"),
       }).addTo(group);
     }
     group.addTo(map);
     bikeLayer.current = group;
-    setBikeCount({ lanes: laneCount, parking: parking?.features.length ?? 0 });
+    setBikeCount({ lanes: laneCount, parking: park?.features.length ?? 0 });
     setBikes("on");
   };
 
   // Ciclovías visibles de entrada si van en bici o scooter.
   useEffect(() => {
-    if (autoBikes && mapRef.current) void loadBikes();
+    setScope("route");
+    if (autoBikes && mapRef.current) void loadBikes(routeMode ? "route" : "all");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [path, theme, autoBikes]);
 
@@ -114,17 +127,23 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
           type="button"
           onClick={toggleBikes}
           disabled={bikes === "loading"}
-          aria-pressed={bikes === "on"}
+          aria-pressed={routeMode ? scope === "all" : bikes === "on"}
           className={cx(
             "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm transition",
-            bikes === "on" ? "border-highlight bg-highlight text-white" : "border-line text-ink hover:bg-surface-muted",
+            !routeMode && bikes === "on" ? "border-highlight bg-highlight text-white" : "border-line text-ink hover:bg-surface-muted",
           )}
         >
           {bikes === "loading" ? <Loader2 className="size-4 animate-spin" /> : <Bike className="size-4" />}
-          {bikes === "on" ? "Ocultar ciclovías" : "Ver ciclovías"}
+          {routeMode ? (scope === "route" ? "Ver todas las ciclovías de la zona" : "Solo las de mi ruta") : bikes === "on" ? "Ocultar ciclovías" : "Ver ciclovías"}
         </button>
       </div>
       <div ref={el} className="image-slot relative z-0 aspect-[4/3] sm:aspect-[16/7]" />
+      <ul className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line px-6 py-3 text-xs text-muted sm:px-10" aria-label="Leyenda del mapa">
+        <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-primary" />Recorrido del {route.routeLabel.startsWith("Metro") ? "Metro" : "bus"}</li>
+        {routeMode && <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-success" />Tu ruta en bici</li>}
+        {bikes === "on" && <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-highlight" />{routeMode && scope === "route" ? "Ciclovía en tu ruta" : "Ciclovías de la zona"}</li>}
+        {bikes === "on" && bikeCount.parking > 0 && <li className="flex items-center gap-2"><span className="size-2 rounded-full border-2 border-highlight" />Cicloparqueadero</li>}
+      </ul>
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-6 py-4 text-sm text-ink sm:px-10 sm:text-base">
         <span className="flex items-center gap-2"><span className="size-2.5 rounded-full bg-success" />{route.from}</span>
         <span className="flex items-center gap-2 text-muted"><ArrowRight className="size-4" />{route.via}</span>
@@ -138,7 +157,7 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
       )}
       {bikes === "on" && (
         <p className="border-t border-line px-6 py-3 text-xs text-muted sm:px-10">
-          {bikeCount.lanes} tramos de ciclovía y {bikeCount.parking} cicloparqueaderos cerca. Línea continua: ciclovía; punteada: cicloacera, ciclocarril o carril compartido. {BIKE_SOURCE}.
+          Línea continua: ciclovía; punteada: cicloacera, ciclocarril o carril compartido. Fuente: {BIKE_SOURCE}.
         </p>
       )}
       {bikes === "error" && (
