@@ -146,3 +146,22 @@ export async function getStreetTimes(a: { lat: number; lng: number }, b: { lat: 
     return null;
   }
 }
+
+/* ───────── Buscador de lugares (OpenStreetMap · Nominatim) ───────── */
+export type FoundPlace = { name: string; detail: string; lat: number; lng: number };
+
+/** Busca direcciones y lugares dentro de Lima. Se llama al enviar, no letra por letra. */
+export async function searchPlaces(q: string): Promise<FoundPlace[]> {
+  const url = "https://nominatim.openstreetmap.org/search?" + new URLSearchParams({
+    format: "jsonv2", q, countrycodes: "pe", viewbox: "-77.25,-11.75,-76.75,-12.45", bounded: "1", limit: "6", "accept-language": "es",
+  });
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`nominatim ${res.status}`);
+  const rows = (await res.json()) as { name?: string; display_name: string; lat: string; lon: string }[];
+  return rows.map((r) => {
+    const parts = r.display_name.split(",").map((x) => x.trim());
+    const name = r.name || parts[0];
+    const rest = parts.filter((x) => x !== name && !/^\d{5}$/.test(x) && x !== "Perú" && x !== "Lima Metropolitana");
+    return { name, detail: rest.slice(0, 3).join(", "), lat: Number(r.lat), lng: Number(r.lon) };
+  });
+}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { brand, themes, type ThemeName } from "./config/brand";
 import type { GoalId, Recommendation } from "./data/content";
-import { NETWORKS, destinationGroups, findTrip, nearestPlace, networkById, placeGroups, type NetworkId } from "./data/networks";
+import { NETWORKS, destinationGroups, findTrip, freeNetwork, nearestPlace, networkById, placeGroups, type NetworkId, type Place } from "./data/networks";
 import { recommend } from "./lib/engine";
 import { bikeCoverage, getBikeData, type BikeCoverage } from "./lib/bikes";
 import { getAir, getBusEta, getStreetTimes, getWeather, type Air, type Weather } from "./lib/live";
@@ -34,10 +34,16 @@ function initialTheme(): ThemeName {
 export default function App() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme);
   const [goal, setGoal] = useState<GoalId>("ahorro");
-  const [networkId, setNetworkId] = useState<NetworkId>(() => {
-    try { return (localStorage.getItem("yio.network") as NetworkId) || "rojo"; } catch { return "rojo"; }
+  const [networkId, setNetworkId] = useState<NetworkId | "libre">(() => {
+    try {
+      const v = localStorage.getItem("yio.network");
+      return v === "libre" || NETWORKS.some((n) => n.id === v) ? (v as NetworkId | "libre") : "rojo";
+    } catch { return "rojo"; }
   });
-  const net = networkById(networkId) ?? networkById("rojo");
+  const libre = networkId === "libre";
+  const net = (!libre && networkById(networkId)) || networkById("rojo");
+  const [origin, setOrigin] = useState<Place | null>(null);
+  const [dest, setDest] = useState<Place | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [hasBike, setHasBike] = useState<boolean>(() => { try { return localStorage.getItem("yio.hasBike") === "1"; } catch { return false; } });
@@ -63,7 +69,7 @@ export default function App() {
 
   useEffect(() => { try { localStorage.setItem("yio.network", networkId); } catch { /* noop */ } }, [networkId]);
 
-  const changeNetwork = (id: NetworkId) => {
+  const changeNetwork = (id: NetworkId | "libre") => {
     if (id === networkId) return;
     setNetworkId(id);
     setFrom("");
@@ -154,7 +160,7 @@ export default function App() {
     } catch { /* noop */ }
   }, [hasBike, hasScooter]);
 
-  const changeFrom = (v: string, netId: NetworkId = networkId) => {
+  const changeFrom = (v: string, netId: NetworkId = net.id) => {
     setFrom(v);
     const next = destinationGroups(networkById(netId), v).flatMap((g) => g.places);
     if (!next.includes(to)) setTo("");
@@ -170,7 +176,7 @@ export default function App() {
             .map((n) => ({ n, ...nearestPlace(n, pos.coords.latitude, pos.coords.longitude) }))
             .sort((a, b) => a.meters - b.meters)[0];
           if (!best || best.meters > 3000) return resolve("No hay paraderos ni estaciones de YIO cerca de ti (a más de 3 km).");
-          if (best.n.id !== networkId) { setNetworkId(best.n.id); setResult(null); }
+          if (best.n.id !== net.id || libre) { setNetworkId(best.n.id); setResult(null); }
           changeFrom(best.place, best.n.id);
           resolve(`Paradero más cercano: ${best.place} (${best.n.name}), a unos ${Math.round(best.meters / 10) * 10} m.`);
         },
@@ -181,14 +187,22 @@ export default function App() {
 
   const calculate = async () => {
     setLoading(true);
-    const trip = findTrip(net, from, to);
-    const [busEta, streets] = trip
-      ? await Promise.all([
-          getBusEta(net, trip),
-          getStreetTimes(net.stops[trip.stopIds[0]], net.stops[trip.stopIds[trip.stopIds.length - 1]]),
-        ])
-      : [null, null];
-    const r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, streets, hasBike, hasScooter });
+    let r: Recommendation | null;
+    if (libre) {
+      if (!origin || !dest) { setLoading(false); return; }
+      const fnet = freeNetwork(origin, dest);
+      const streets = await getStreetTimes(origin, dest);
+      r = recommend({ network: fnet, from: fnet.stops.A.place, to: fnet.stops.B.place, goal, now: new Date(), weather, air, busEta: null, streets, hasBike, hasScooter });
+    } else {
+      const trip = findTrip(net, from, to);
+      const [busEta, streets] = trip
+        ? await Promise.all([
+            getBusEta(net, trip),
+            getStreetTimes(net.stops[trip.stopIds[0]], net.stops[trip.stopIds[trip.stopIds.length - 1]]),
+          ])
+        : [null, null];
+      r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, streets, hasBike, hasScooter });
+    }
     setResult(r);
     setBikeCov(null);
     setSaveState({ kind: "idle" });
@@ -226,7 +240,7 @@ export default function App() {
       from: result.route.from,
       to: result.route.to,
       mode: result.recommended,
-      route: result.options.find((o) => o.id === "bus")?.title,
+      route: result.noBus ? "Sin bus" : result.options.find((o) => o.id === "bus")?.title,
       amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
       kcal: rec.kcal,
     };
@@ -293,6 +307,10 @@ export default function App() {
           networks={NETWORKS}
           networkId={networkId}
           onNetwork={changeNetwork}
+          origin={origin}
+          dest={dest}
+          onOrigin={(v) => { setOrigin(v); setResult(null); }}
+          onDest={(v) => { setDest(v); setResult(null); }}
           fromGroups={fromGroups}
           toGroups={toGroups}
           onLocate={locate}
@@ -314,7 +332,7 @@ export default function App() {
           <div ref={resultsRef} className="scroll-mt-24 space-y-10">
             <CorridorStatus data={result} />
             <RouteSummary data={result} save={saveState} onSave={save} />
-            <MapSection route={result.route} path={result.path} theme={theme} bikePath={result.bikePath} bikeCov={bikeCov}
+            <MapSection route={result.route} path={result.path} theme={theme} bikePath={result.bikePath} bikeCov={bikeCov} noBus={result.noBus}
               autoBikes={hasBike || hasScooter || result.recommended === "bike" || result.recommended === "scooter"} />
             <DirectComparison data={result} bikeCov={bikeCov} />
             <CumulativeImpact data={result.impact} />

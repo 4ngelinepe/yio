@@ -5,7 +5,7 @@ import { IconTile } from "./ui/primitives";
 
 /**
  * Estado del día, traducido a decisiones.
- * - En "Sentirme mejor": tarjeta completa "Hoy para tu cuerpo" (aire, sol, mejor hora, tu movimiento).
+ * - En "Moverme más": tarjeta completa "Hoy para tu cuerpo" (aire, sol, mejor hora, tu movimiento).
  * - En las demás metas: una franja compacta que no le quita protagonismo a la recomendación.
  */
 export function CorridorStatus({ data }: { data: Recommendation }) {

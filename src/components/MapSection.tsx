@@ -13,8 +13,8 @@ const cssVar = (name: string) =>
 
 type BikeState = "off" | "loading" | "on" | "error";
 
-export function MapSection({ route, path, theme, autoBikes = false, bikePath, bikeCov }: {
-  route: Recommendation["route"]; path: Recommendation["path"]; theme: string;
+export function MapSection({ route, path, theme, autoBikes = false, bikePath, bikeCov, noBus = false }: {
+  route: Recommendation["route"]; path: Recommendation["path"]; theme: string; noBus?: boolean;
   bikePath?: [number, number][]; bikeCov?: BikeCoverage | null;
   /** Muestra las ciclovías de entrada (cuando el usuario tiene bici/scooter o se recomienda). */
   autoBikes?: boolean;
@@ -38,8 +38,9 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
     }).addTo(map);
 
     const pts = path.map((p) => [p.lat, p.lng] as [number, number]);
-    L.polyline(pts, { color: cssVar("--primary"), weight: 5, opacity: 0.9 }).addTo(map);
-    path.slice(1, -1).forEach((p) =>
+    L.polyline(pts, { color: cssVar("--primary"), weight: noBus ? 4 : 5, opacity: 0.9, dashArray: noBus ? "2 8" : undefined, lineCap: "round" })
+      .bindTooltip(noBus ? "Tu ruta a pie" : route.routeLabel).addTo(map);
+    if (!noBus) path.slice(1, -1).forEach((p) =>
       L.circleMarker([p.lat, p.lng], { radius: 4, color: cssVar("--primary"), fillColor: "#fff", fillOpacity: 1, weight: 2 })
         .bindTooltip(p.name).addTo(map),
     );
@@ -55,7 +56,7 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
     map.fitBounds(L.latLngBounds(showBike ? [...pts, ...bikePath!] : pts), { padding: [40, 40] });
     setBikes("off");
     return () => { map.remove(); mapRef.current = null; bikeLayer.current = null; };
-  }, [path, theme, bikePath, autoBikes]);
+  }, [path, theme, bikePath, autoBikes, noBus]);
 
   const routeMode = autoBikes && !!bikePath && bikePath.length > 1;
 
@@ -139,7 +140,7 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
       </div>
       <div ref={el} className="image-slot relative z-0 aspect-[4/3] sm:aspect-[16/7]" />
       <ul className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line px-6 py-3 text-xs text-muted sm:px-10" aria-label="Leyenda del mapa">
-        <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-primary" />Recorrido del {route.routeLabel.startsWith("Metro") ? "Metro" : "bus"}</li>
+        <li className="flex items-center gap-2"><span className={noBus ? "w-5 border-t-4 border-dotted border-primary" : "h-1 w-5 rounded-full bg-primary"} />{noBus ? "Tu ruta a pie" : `Recorrido del ${route.routeLabel.startsWith("Metro") ? "Metro" : "bus"}`}</li>
         {routeMode && <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-success" />Tu ruta en bici</li>}
         {bikes === "on" && <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-highlight" />{routeMode && scope === "route" ? "Ciclovía en tu ruta" : "Ciclovías de la zona"}</li>}
         {bikes === "on" && bikeCount.parking > 0 && <li className="flex items-center gap-2"><span className="size-2 rounded-full border-2 border-highlight" />Cicloparqueadero</li>}

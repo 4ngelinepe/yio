@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { ArrowDown, Bike, Loader2, LocateFixed, Scooter } from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { ArrowDown, Bike, Loader2, LocateFixed, MapPin, Scooter, Search, X } from "lucide-react";
 import { goals, type GoalId } from "../data/content";
-import type { Network, NetworkId, PlaceGroup } from "../data/networks";
-import type { Air, Weather } from "../lib/live";
+import type { Network, NetworkId, Place, PlaceGroup } from "../data/networks";
+import { searchPlaces, type Air, type FoundPlace, type Weather } from "../lib/live";
 import { cx } from "../lib/tones";
 import { aqiLabel, isPeak, PEAK_LABEL } from "../lib/engine";
 import { Icon } from "./ui/Icon";
@@ -12,8 +12,12 @@ type Props = {
   clock: string;
   dark: boolean;
   networks: Network[];
-  networkId: NetworkId;
-  onNetwork: (id: NetworkId) => void;
+  networkId: NetworkId | "libre";
+  onNetwork: (id: NetworkId | "libre") => void;
+  origin: Place | null;
+  dest: Place | null;
+  onOrigin: (p: Place | null) => void;
+  onDest: (p: Place | null) => void;
   weather: Weather | null;
   air: Air | null;
   liveLoading: boolean;
@@ -62,7 +66,96 @@ function StopSelect({ id, label, value, groups, placeholder, disabled, onChange 
   );
 }
 
+/** Lima aproximada: el cálculo de calles solo funciona dentro de esta caja. */
+const inLima = (lat: number, lng: number) => lat > -12.6 && lat < -11.6 && lng > -77.3 && lng < -76.6;
+
+function PlaceSearch({ id, label, value, onChange, locate }: {
+  id: string; label: string; value: Place | null; onChange: (p: Place | null) => void; locate?: boolean;
+}) {
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState<"search" | "gps" | null>(null);
+  const [found, setFound] = useState<FoundPlace[] | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const search = async (e: FormEvent) => {
+    e.preventDefault();
+    if (q.trim().length < 3) { setMsg("Escribe al menos 3 letras."); return; }
+    setBusy("search"); setMsg(null); setFound(null);
+    try {
+      const r = await searchPlaces(q.trim());
+      setFound(r);
+      if (!r.length) setMsg("No encontramos ese lugar en Lima. Prueba con la calle y el distrito.");
+    } catch { setMsg("No pudimos buscar ahora. Revisa tu conexión."); }
+    setBusy(null);
+  };
+
+  const gps = () => {
+    if (!navigator.geolocation) { setMsg("Tu navegador no permite ubicarte."); return; }
+    setBusy("gps"); setMsg(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setBusy(null);
+        const { latitude: lat, longitude: lng } = pos.coords;
+        if (!inLima(lat, lng)) { setMsg("Estás fuera de Lima: YIO por ahora solo calcula tramos en Lima."); return; }
+        onChange({ name: "Mi ubicación", lat, lng });
+      },
+      () => { setBusy(null); setMsg("No pudimos ver tu ubicación. Revisa el permiso del navegador."); },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  };
+
+  if (value) {
+    return (
+      <div>
+        <p className="mb-1.5 text-sm text-muted">{label}</p>
+        <div className="flex items-center gap-3 rounded-tile border-2 border-primary bg-primary-soft px-4 py-3 text-lg text-primary-text">
+          <MapPin className="size-5 shrink-0" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">{value.name}</span>
+          <button type="button" onClick={() => { onChange(null); setFound(null); }} aria-label={`Cambiar ${label.toLowerCase()}`}
+            className="rounded-full p-1 hover:bg-surface-muted"><X className="size-4" /></button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1.5 block text-sm text-muted">{label}</label>
+      <form onSubmit={search} className="flex gap-2">
+        <input id={id} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Calle, lugar o distrito" autoComplete="off"
+          className="min-w-0 flex-1 rounded-tile border-2 border-line bg-surface-muted px-4 py-3 text-lg text-ink placeholder:text-subtle focus:border-primary" />
+        <button type="submit" disabled={!!busy} aria-label="Buscar"
+          className="rounded-tile border-2 border-line px-3 text-ink hover:bg-surface-muted">
+          {busy === "search" ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-5" />}
+        </button>
+      </form>
+      {locate && (
+        <button type="button" onClick={gps} disabled={!!busy}
+          className="mt-2 inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-muted">
+          {busy === "gps" ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />} Mi ubicación
+        </button>
+      )}
+      {found && found.length > 0 && (
+        <ul className="mt-2 divide-y divide-line overflow-hidden rounded-tile border border-line" aria-label="Resultados">
+          {found.map((f, i) => (
+            <li key={i}>
+              <button type="button" onClick={() => { onChange({ name: f.name, lat: f.lat, lng: f.lng }); setFound(null); setQ(""); }}
+                className="w-full px-4 py-2.5 text-left hover:bg-surface-muted">
+                <span className="block text-ink">{f.name}</span>
+                {f.detail && <span className="block text-xs text-muted">{f.detail}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {msg && <p className="mt-2 text-sm text-muted">{msg}</p>}
+    </div>
+  );
+}
+
 export function DailyRecommendation(p: Props) {
+  const libre = p.networkId === "libre";
+  const ready = libre ? !!p.origin && !!p.dest : !!p.from && !!p.to;
   const [locating, setLocating] = useState(false);
   const [locateMsg, setLocateMsg] = useState<string | null>(null);
 
@@ -112,7 +205,7 @@ export function DailyRecommendation(p: Props) {
       <div className="mt-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg text-ink">¿Qué tramo vas a hacer?</h2>
-          <button
+          {!libre && <button
             type="button"
             onClick={locate}
             disabled={locating}
@@ -120,9 +213,20 @@ export function DailyRecommendation(p: Props) {
           >
             {locating ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
             Paradero más cercano
-          </button>
+          </button>}
         </div>
-        <div role="radiogroup" aria-label="Corredor" className="mb-4 flex flex-wrap gap-2">
+        <div role="radiogroup" aria-label="Cómo vas" className="mb-4 flex flex-wrap gap-2">
+          <button
+            type="button" role="radio" aria-checked={libre}
+            onClick={() => p.onNetwork("libre")}
+            className={cx(
+              "inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm transition",
+              libre ? "border-primary bg-primary text-primary-fg" : "border-line text-ink hover:bg-surface-muted",
+            )}
+          >
+            <Icon name="footprints" className="size-4" />Sin bus
+            <span className={cx("text-xs", libre ? "opacity-80" : "text-success-text")}>· a pie o en bici</span>
+          </button>
           {p.networks.map((n) => {
             const active = n.id === p.networkId;
             return (
@@ -145,7 +249,7 @@ export function DailyRecommendation(p: Props) {
           })}
           <span className="rounded-full border border-dashed border-line px-4 py-2 text-sm text-subtle">Azul y Morado · pronto</span>
         </div>
-        {(() => {
+        {!libre && (() => {
           const peak = isPeak(new Date());
           return (
             <p className={cx("-mt-1 mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs", peak ? "bg-warning-soft text-warning-text" : "bg-surface-muted text-muted")}>
@@ -154,6 +258,13 @@ export function DailyRecommendation(p: Props) {
             </p>
           );
         })()}
+        {libre ? (
+          <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto_1fr]">
+            <PlaceSearch id="origin" label="Desde" value={p.origin} onChange={p.onOrigin} locate />
+            <ArrowDown className="mx-auto mt-2 size-5 text-subtle sm:mt-11 sm:-rotate-90" aria-hidden />
+            <PlaceSearch id="dest" label="Hasta" value={p.dest} onChange={p.onDest} />
+          </div>
+        ) : (
         <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
           <StopSelect id="from" label="Desde" value={p.from} groups={p.fromGroups} placeholder="Elige tu paradero" onChange={p.onFrom} />
           <ArrowDown className="mx-auto mb-3 size-5 text-subtle sm:-rotate-90" aria-hidden />
@@ -163,13 +274,14 @@ export function DailyRecommendation(p: Props) {
             disabled={!p.from} onChange={p.onTo}
           />
         </div>
+        )}
         {locateMsg && <p className="mt-2 text-sm text-muted">{locateMsg}</p>}
       </div>
 
       {/* Objetivo */}
       <fieldset className="mt-8">
         <legend id="goal-title" className="mb-4 text-lg text-ink">¿Qué buscas hoy?</legend>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-3">
           {goals.map((g) => {
             const active = g.id === p.goal;
             return (
@@ -209,7 +321,7 @@ export function DailyRecommendation(p: Props) {
         <Button
           className="w-full sm:w-auto sm:px-10"
           onClick={p.onCalculate}
-          disabled={p.loading || !p.from || !p.to}
+          disabled={p.loading || !ready}
           icon={p.loading ? <Loader2 className="size-5 animate-spin" /> : null}
         >
           {p.loading ? "Calculando…" : "Calcular recomendación"}

@@ -43,7 +43,7 @@ export type Network = {
   routes: Route[];
   /** Cómo se nombra en las frases: "el Rojo", "el Metro". */
   busName: string;
-  kind: "bus" | "rail";
+  kind: "bus" | "rail" | "none";
   /** Velocidad promedio con paradas, km/h: [hora punta, resto]. */
   speedKmh: Range;
   /** Espera estimada cuando no hay dato en vivo, minutos. */
@@ -320,4 +320,22 @@ export function rideDistanceM(net: Network, trip: Trip): number {
   let d = 0;
   for (let k = 1; k < trip.stopIds.length; k++) d += distanceM(net.stops[trip.stopIds[k - 1]], net.stops[trip.stopIds[k]]);
   return d;
+}
+
+/* ───────── Sin bus: tramo libre entre dos puntos ───────── */
+export type Place = { name: string; lat: number; lng: number };
+
+/** Red de dos puntos para el modo "Sin bus · a pie o en bici" (no hay bus que comparar). */
+export function freeNetwork(a: Place, b: Place): Network {
+  const bName = b.name === a.name ? `${b.name} (destino)` : b.name;
+  return {
+    id: "rojo", name: "A pie o en bici", short: "Sin bus", fare: 0, electric: false, live: false,
+    source: "OpenStreetMap", busName: "el bus", kind: "none", speedKmh: [12, 18],
+    wait: { peak: [0, 0], off: [0, 0], note: "" },
+    stops: {
+      A: { id: "A", name: a.name, place: a.name, lat: a.lat, lng: a.lng },
+      B: { id: "B", name: bName, place: bName, lat: b.lat, lng: b.lng },
+    },
+    routes: [{ key: "libre", code: "", name: "A pie o en bici", dirLabel: "", ids: ["A", "B"], loop: false, primary: true }],
+  };
 }

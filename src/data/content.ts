@@ -9,10 +9,9 @@ export type IconName =
   | "train" | "alert" | "flame" | "footprints" | "wind" | "sun" | "cloud" | "rain" | "trend";
 
 export const goals: { id: GoalId; label: string; icon: IconName }[] = [
-  { id: "rapido", label: "Moverme rápido", icon: "zap" },
+  { id: "rapido", label: "Llegar rápido", icon: "zap" },
   { id: "ahorro", label: "Ahorrar plata", icon: "piggy" },
-  { id: "trafico", label: "Evitar tráfico", icon: "traffic" },
-  { id: "bienestar", label: "Sentirme mejor", icon: "sparkles" },
+  { id: "bienestar", label: "Moverme más", icon: "footprints" },
 ];
 
 export type StatusLevel = 1 | 2 | 3;
@@ -68,6 +67,8 @@ export type Recommendation = {
   body: { mode: "walk" | "bike"; recommended: boolean; activeMin: number; weeklyPct: number; steps?: number; kcal: number };
   path: { lat: number; lng: number; name: string }[];
   live: boolean;
+  /** Tramo sin bus: el recorrido del mapa es la ruta a pie. */
+  noBus?: boolean;
 };
 
 export const quotes: Record<GoalId, string[]> = {

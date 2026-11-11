@@ -110,6 +110,7 @@ export function recommend(input: EngineInput): Recommendation | null {
   const last = stops[trip.stopIds[trip.stopIds.length - 1]];
   const middle = stops[trip.stopIds[Math.floor(trip.stopIds.length / 2)]];
   const peak = isPeak(input.now);
+  const noBus = net.kind === "none";
 
   // Distancias y tiempos: reales por calles (OpenRouteService) si hay; si no, línea recta × 1.2.
   const sw = input.streets?.walk ?? null;
@@ -224,7 +225,22 @@ export function recommend(input: EngineInput): Recommendation | null {
   let recommended: Exclude<ModeId, "taxi">;
   let why: string;
   const wm = mid(walk.minutes);
-  switch (input.goal) {
+  if (noBus) {
+    // Sin bus: se elige entre caminar, bici y scooter.
+    const wheels = [bikeOk ? bike : null, scooterOk ? scooter : null].filter((o): o is ModeOption => !!o);
+    const quickest = [walk, ...wheels].sort((a, b) => mid(a.minutes) - mid(b.minutes))[0];
+    if (input.goal === "rapido") recommended = quickest.id as Exclude<ModeId, "taxi">;
+    else if (input.goal === "ahorro") recommended = wm <= 25 || !wheels.length ? "walk" : (wheels[0].id as Exclude<ModeId, "taxi">);
+    else recommended = wm <= 60 || !bikeOk ? "walk" : "bike";
+    why = status.level === 3 ? "Ojo: la calidad del aire no está buena ahora. Si puedes, espera o toma un bus."
+      : recommended === "walk"
+        ? wm > 60 ? "Es un tramo largo a pie. Si tienes bici o scooter, márcalo arriba."
+        : input.goal === "rapido" && wheels.length ? "Para este tramo, caminando llegas igual de rápido."
+        : input.goal === "bienestar" ? "Caminando sumas minutos de actividad y el aire lo permite."
+        : "Es un tramo caminable: no gastas nada."
+      : recommended === "bike" ? input.goal === "bienestar" ? "El tramo es largo a pie; en bici te mueves igual." : "En bici llegas antes y no gastas nada."
+      : "En scooter llegas antes, sin tráfico y sin gastar.";
+  } else switch (input.goal) {
     case "rapido":
       recommended = fastest.id as Exclude<ModeId, "taxi">;
       why = recommended === "walk" ? "Caminando llegas antes que esperando el bus."
@@ -259,7 +275,7 @@ export function recommend(input: EngineInput): Recommendation | null {
         : recommended === "scooter" ? "El tramo es largo a pie; en scooter llegas sin tráfico."
         : "Hoy mejor no caminar este tramo completo.";
   }
-  if (!walkOk && status.level === 3 && recommended === "bus") why = "La calidad del aire no está para caminar ahora.";
+  if (!noBus && !walkOk && status.level === 3 && recommended === "bus") why = "La calidad del aire no está para caminar ahora.";
   if (recommended === "bus" && (closed || noMore)) {
     why = closed
       ? `Ojo: ${busName} no opera a esta hora (${net.hours!.label}). Es la mejor opción cuando vuelva a funcionar.`
@@ -287,9 +303,9 @@ export function recommend(input: EngineInput): Recommendation | null {
   const savingsHow: string[] = active
     ? [
         `Vas ${modeName}: tu viaje cuesta S/ 0.`,
-        fare > 0 ? `Frente ${busName.startsWith("el ") ? "al " + busName.slice(3) : "a " + busName}: ahorras el pasaje, ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis, así que frente a él no hay diferencia.`,
+        noBus ? null : fare > 0 ? `Frente ${busName.startsWith("el ") ? "al " + busName.slice(3) : "a " + busName}: ahorras el pasaje, ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis, así que frente a él no hay diferencia.`,
         `Frente a un taxi (${solesRange(taxi.cost)} por ${taxiKm.toFixed(1)} km): ahorras hasta ${soles(taxi.cost[1])}.`,
-      ]
+      ].filter((x): x is string => !!x)
     : [
         `Un taxi por este tramo (${taxiKm.toFixed(1)} km) cuesta ${solesRange(taxi.cost)}.`,
         fare > 0 ? `En ${busName} pagas ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis.`,
@@ -303,10 +319,11 @@ export function recommend(input: EngineInput): Recommendation | null {
     createdAt: input.now.toISOString(),
     status,
     route: {
-      from: input.from, via: middle.place, to: input.to, routeLabel: trip.route.loop ? `${net.name} · ${trip.route.code}` : net.kind === "rail" ? `${net.name} · ${trip.route.dirLabel}` : `${net.name} · Ruta ${trip.route.code} · ${trip.route.dirLabel}`,
-      note: `${trip.stopIds.length - 1} ${net.kind === "rail" ? "estaciones" : "paraderos"}`,
+      from: input.from, via: noBus ? `${(walkM / 1000).toFixed(1)} km` : middle.place, to: input.to,
+      routeLabel: noBus ? "A pie o en bici" : trip.route.loop ? `${net.name} · ${trip.route.code}` : net.kind === "rail" ? `${net.name} · ${trip.route.dirLabel}` : `${net.name} · Ruta ${trip.route.code} · ${trip.route.dirLabel}`,
+      note: noBus ? `${(walkM / 1000).toFixed(1)} km por calles` : `${trip.stopIds.length - 1} ${net.kind === "rail" ? "estaciones" : "paraderos"}`,
     },
-    options: [walk, bike, scooter, bus, taxi],
+    options: noBus ? [walk, bike, scooter, taxi] : [walk, bike, scooter, bus, taxi],
     recommended,
     why,
     savings,
@@ -359,7 +376,10 @@ export function recommend(input: EngineInput): Recommendation | null {
         kcal: o.kcal,
       };
     })(),
-    path: trip.stopIds.map((id) => ({ lat: stops[id].lat, lng: stops[id].lng, name: stops[id].place })),
+    path: noBus && sw?.path && sw.path.length > 1
+      ? sw.path.map(([lat, lng], i, a) => ({ lat, lng, name: i === 0 ? first.place : i === a.length - 1 ? last.place : "" }))
+      : trip.stopIds.map((id) => ({ lat: stops[id].lat, lng: stops[id].lng, name: stops[id].place })),
     live: !!eta && eta.source === "live",
+    noBus,
   };
 }
