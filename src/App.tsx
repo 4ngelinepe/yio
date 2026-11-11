@@ -243,7 +243,7 @@ export default function App() {
       from: result.route.from,
       to: result.route.to,
       mode: result.recommended,
-      route: result.noBus ? "Sin bus" : result.options.find((o) => o.id === "bus")?.title,
+      route: result.noBus ? "A pie o en bici" : result.options.find((o) => o.id === "bus")?.title,
       amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
       kcal: rec.kcal,
     };

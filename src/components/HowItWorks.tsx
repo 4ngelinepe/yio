@@ -6,11 +6,11 @@ import { Button } from "./ui/primitives";
 const STEPS: { title: string; body: string }[] = [
   {
     title: "Elige cómo vas",
-    body: "Sin bus, si vas a pie o en bici. O un corredor: Rojo, Expreso San Isidro (gratis y eléctrico) o Metro Línea 1.",
+    body: "Por dirección, si quieres que YIO arme el camino: a pie, en bici o combinado con bus o Metro. O un corredor: Rojo, Expreso San Isidro (gratis y eléctrico) o Metro Línea 1.",
   },
   {
     title: "Marca tu tramo",
-    body: "Con un corredor eliges el paradero de subida y el de bajada. Sin bus usas tu ubicación y buscas a dónde vas.",
+    body: "Por dirección usas tu ubicación y buscas a dónde vas. Con un corredor eliges el paradero de subida y el de bajada.",
   },
   {
     title: "Dinos qué buscas hoy",

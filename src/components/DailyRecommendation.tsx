@@ -218,8 +218,8 @@ export function DailyRecommendation(p: Props) {
               libre ? "border-primary bg-primary text-primary-fg" : "border-line text-ink hover:bg-surface-muted",
             )}
           >
-            <Icon name="footprints" className="size-4" />Sin bus
-            <span className={cx("text-xs", libre ? "opacity-80" : "text-success-text")}>· a pie o en bici</span>
+            <Icon name="footprints" className="size-4" />Por dirección
+            <span className={cx("text-xs", libre ? "opacity-80" : "text-success-text")}>· a pie, en bici o combinado</span>
           </button>
           {p.networks.map((n) => {
             const active = n.id === p.networkId;

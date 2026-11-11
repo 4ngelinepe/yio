@@ -322,14 +322,14 @@ export function rideDistanceM(net: Network, trip: Trip): number {
   return d;
 }
 
-/* ───────── Sin bus: tramo libre entre dos puntos ───────── */
+/* ───────── Por dirección: tramo libre entre dos puntos ───────── */
 export type Place = { name: string; lat: number; lng: number };
 
-/** Red de dos puntos para el modo "Sin bus · a pie o en bici" (no hay bus que comparar). */
+/** Red de dos puntos para el modo "Por dirección" (no hay bus que comparar). */
 export function freeNetwork(a: Place, b: Place): Network {
   const bName = b.name === a.name ? `${b.name} (destino)` : b.name;
   return {
-    id: "rojo", name: "A pie o en bici", short: "Sin bus", fare: 0, electric: false, live: false,
+    id: "rojo", name: "A pie o en bici", short: "Por dirección", fare: 0, electric: false, live: false,
     source: "OpenStreetMap", busName: "el bus", kind: "none", speedKmh: [12, 18],
     wait: { peak: [0, 0], off: [0, 0], note: "" },
     stops: {
