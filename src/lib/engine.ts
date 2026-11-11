@@ -59,6 +59,31 @@ export function aqiLabel(aqi: number): string {
   return aqi <= 50 ? "bueno" : aqi <= 100 ? "aceptable" : aqi <= 150 ? "regular" : aqi <= 200 ? "malo" : "muy malo";
 }
 
+
+/** Índice UV en palabras (escala OMS). */
+export function uvLabel(uv: number): string {
+  return uv < 3 ? "bajo" : uv < 6 ? "moderado" : uv < 8 ? "alto" : uv < 11 ? "muy alto" : "extremo";
+}
+
+/** Mejor hora para caminar en las próximas horas: aire, sol, calor y lluvia. */
+function bestWalkHour(weather: Weather | null, air: Air | null): Recommendation["conditions"]["bestHour"] {
+  if (!weather?.hours?.length) return undefined;
+  let best: { i: number; score: number } | null = null;
+  weather.hours.forEach((h, i) => {
+    const hour = Number(h.hour.slice(0, 2));
+    if (hour < 6 || hour > 20) return;
+    const aqi = air?.hourly?.[i] ?? air?.usAqi ?? 50;
+    const score = aqi / 50 + (h.uv >= 8 ? 3 : h.uv >= 6 ? 1.5 : h.uv >= 3 ? 0.5 : 0)
+      + (h.temp >= 28 ? 2 : h.temp >= 26 ? 1 : 0) + (h.rainProb >= 50 ? 3 : 0) + i * 0.05; // a igualdad, antes es mejor
+    if (!best || score < best.score) best = { i, score };
+  });
+  if (!best) return undefined;
+  const b = weather.hours[(best as { i: number }).i];
+  const aqi = air?.hourly?.[(best as { i: number }).i] ?? air?.usAqi;
+  const why = [aqi !== undefined ? `aire ${aqiLabel(aqi)}` : null, `UV ${uvLabel(b.uv)}`, `${b.temp}°`].filter(Boolean).join(", ");
+  return { hour: `${b.hour.slice(0, 2)}:00`, why, now: (best as { i: number }).i === 0 };
+}
+
 function airStatus(air: Air | null, weather: Weather | null): { level: StatusLevel; reason: string; unknown?: boolean } {
   if (!air && !weather) return { level: 1, reason: "Sin conexión o sin datos en vivo: la recomendación usa tiempos estimados.", unknown: true };
   let level: StatusLevel = 1;
@@ -241,6 +266,16 @@ export function recommend(input: EngineInput): Recommendation | null {
       : `Ojo: ya no quedan salidas hoy en esta ruta. Es la mejor opción para mañana.`;
   }
 
+  // Qué cambió en la recomendación por el aire o el clima (lo que el banner debe decir).
+  const uvNow = input.weather?.uvNow ?? 0;
+  const effect = status.unknown ? "Sin datos de clima ni aire: la recomendación usa tiempos estimados."
+    : status.level === 3 ? "Por el aire de ahora, YIO no te recomienda caminar ni pedalear."
+    : (input.weather?.rainy || input.weather?.rainSoon) && (input.hasBike || input.hasScooter) ? "Por la lluvia, YIO no te sugiere bici ni scooter ahora."
+    : input.weather && input.weather.temp >= 30 ? "Hace calor: si caminas, lleva agua y busca sombra."
+    : uvNow >= 8 && recommended === "walk" ? "Caminar es buena opción, pero cuídate del sol: el UV está muy alto."
+    : status.level === 2 ? "Se puede caminar, con cuidado."
+    : "Buen momento para caminar o pedalear.";
+
   const rec = { walk, bike, scooter, bus }[recommended];
   const active = recommended !== "bus";
   const savings: Range =
@@ -300,6 +335,29 @@ export function recommend(input: EngineInput): Recommendation | null {
       ],
     },
     quote: quotes[input.goal][input.now.getDate() % quotes[input.goal].length],
+    goal: input.goal,
+    conditions: {
+      air: input.air ? aqiLabel(input.air.usAqi) : undefined,
+      uv: input.weather ? {
+        value: Math.round(input.weather.uvNow),
+        label: uvLabel(input.weather.uvNow),
+        advice: input.weather.uvNow >= 8 ? "Si caminas: gorra, bloqueador y vereda con sombra."
+          : input.weather.uvNow >= 6 ? "Si caminas: gorra y bloqueador." : undefined,
+      } : undefined,
+      bestHour: bestWalkHour(input.weather, input.air),
+      effect,
+    },
+    body: (() => {
+      const m: "walk" | "bike" = recommended === "bike" ? "bike" : "walk";
+      const o = m === "bike" ? bike : walk;
+      const activeMin = Math.round(mid(o.minutes));
+      return {
+        mode: m, recommended: recommended === m, activeMin,
+        weeklyPct: Math.round((activeMin / 150) * 100),
+        steps: m === "walk" ? Math.round(walkM / 0.75 / 100) * 100 : undefined,
+        kcal: o.kcal,
+      };
+    })(),
     path: trip.stopIds.map((id) => ({ lat: stops[id].lat, lng: stops[id].lng, name: stops[id].place })),
     live: !!eta && eta.source === "live",
   };

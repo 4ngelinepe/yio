@@ -100,9 +100,48 @@ function esiPlace(name: string): string {
   return n.replace(/\bCEV (\w+)/i, (_m, w: string) => `CEV ${w.charAt(0).toUpperCase()}${w.slice(1).toLowerCase()}`);
 }
 
+
+/* ───────── Ortografía: tildes, ñ y abreviaturas (los datos de origen las pierden) ───────── */
+
+const SPELLING: Record<string, string> = {
+  // Corredor Rojo
+  "Asuncio": "Asunción", "Aviacion": "Aviación", "Bambues": "Bambúes", "Bartolome Herrera": "Bartolomé Herrera",
+  "Berlin": "Berlín", "Catolica": "Católica", "Circunvalacion": "Circunvalación", "Clinica San Felipe": "Clínica San Felipe",
+  "Constructores (molina)": "Constructores (La Molina)", "Elbosque": "El Bosque", "Estacion Naval": "Estación Naval",
+  "Flora Tristan": "Flora Tristán", "Flora Tristan(cons)": "Flora Tristán (Constructores)", "Gonzales Prada": "González Prada",
+  "Huarochiri": "Huarochirí", "Huarochiri(melgarejo)": "Huarochirí (Melgarejo)",
+  "Industriales(constructores)": "Industriales (Constructores)", "Ingenieros(const)": "Ingenieros (Constructores)",
+  "Javier Prado(molina NS)": "Javier Prado (La Molina, norte–sur)", "Javier Prado(molina SN)": "Javier Prado (La Molina, sur–norte)",
+  "Jimenez Borja": "Jiménez Borja", "Jose Marti": "José Martí", "Lopez Alburjar": "López Albújar", "Los Angeles": "Los Ángeles",
+  "Masias": "Masías", "Molina(constructores)": "La Molina (Constructores)", "Monaco": "Mónaco", "Orquideas": "Orquídeas",
+  "Ovalo": "Óvalo", "Ovalo San Juan Bautista": "Óvalo San Juan Bautista", "Paris": "París", "Quinones": "Quiñones",
+  "Rio Amarillo": "Río Amarillo", "Sauces(molina)": "Los Sauces (La Molina)", "Union": "Unión",
+  "Universitaria(aux)": "Universitaria (auxiliar)", "Victor Malasquez": "Víctor Malásquez",
+  // Expreso San Isidro
+  "Av Canaval Moreyra cuadra 1.1": "Av. Canaval y Moreyra cuadra 1", "Avenida del Parque Norte cuadra 4": "Av. del Parque Norte cuadra 4",
+  "Av. Salverry con Ca Burgos": "Av. Salaverry con Ca. Burgos", "Ca. Miguel Dasso con C. Victor Maurtua": "Ca. Miguel Dasso con Ca. Víctor Maúrtua",
+  "Calle Antaquera cuadra 3": "Calle Antequera cuadra 3", "Parque San Martin de Porres": "Parque San Martín de Porres",
+  "Óvalo Gutierrez": "Óvalo Gutiérrez", "Av. Dos de Mayo con Alamos": "Av. Dos de Mayo con Álamos",
+  "Biblioteca Municipal (Av. Conquistadores cuadra5)": "Biblioteca Municipal (Av. Conquistadores cuadra 5)",
+};
+
+/** Correcciones por patrón para nombres de calles que se repiten. */
+function spell(name: string): string {
+  let n = SPELLING[name] ?? name;
+  n = n
+    .replace(/^Av\. SALAVERRY CUADRA (\d+)$/, "Av. Salaverry cuadra $1")
+    .replace(/\bAramburu\b/, "Aramburú")
+    .replace(/\bMiro Quesada\b/, "Miró Quesada")
+    .replace(/\bPerez Aranibar\b/, "Pérez Araníbar")
+    .replace(/\bVictor Andres Belaunde\b/, "Víctor Andrés Belaúnde")
+    .replace(/\bAv\. Del\b/, "Av. del")
+    .replace(/cuadra 0(\d)\b/, "cuadra $1");
+  return n;
+}
+
 function buildStops(raw: Record<string, [string, number, number]>, clean: (n: string) => string) {
   return Object.fromEntries(
-    Object.entries(raw).map(([id, [name, lat, lng]]) => [id, { id, name, place: clean(name), lat, lng }]),
+    Object.entries(raw).map(([id, [name, lat, lng]]) => [id, { id, name, place: spell(clean(name)), lat, lng }]),
   ) as Record<string, Stop>;
 }
 

@@ -290,7 +290,7 @@ export default function App() {
 
         {result && (
           <div ref={resultsRef} className="scroll-mt-24 space-y-10">
-            <CorridorStatus status={result.status} />
+            <CorridorStatus data={result} />
             <RouteSummary data={result} save={saveState} onSave={save} />
             <MapSection route={result.route} path={result.path} theme={theme}
               autoBikes={hasBike || hasScooter || result.recommended === "bike" || result.recommended === "scooter"} />

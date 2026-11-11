@@ -10,18 +10,22 @@ import type { IconName } from "../data/content";
 import { ARRIVALS_URL, ESI_ARRIVALS_URL, STREET_TIMES_URL } from "./supabase";
 import type { Network, Trip } from "../data/networks";
 
-export type HourForecast = { hour: string; temp: number; label: string; icon: IconName; rainProb: number };
+export type HourForecast = { hour: string; temp: number; label: string; icon: IconName; rainProb: number; uv: number };
 export type Weather = {
   temp: number; code: number; label: string; icon: IconName; rainy: boolean;
   /** Próximas horas (cada 3 h). */
   next: HourForecast[];
   /** Probabilidad de lluvia ≥ 50% en las próximas 3 horas. */
   rainSoon: boolean;
+  /** Índice UV actual. */
+  uvNow: number;
+  /** Las próximas 13 horas (para calcular la mejor hora para caminar). */
+  hours: HourForecast[];
   /** Hora local de Lima, "HH:MM". */
   sunrise: string;
   sunset: string;
 };
-export type Air = { usAqi: number; pm25: number };
+export type Air = { usAqi: number; pm25: number; hourly: number[] };
 
 function describe(code: number): { label: string; icon: IconName; rainy: boolean } {
   if (code === 0) return { label: "Despejado", icon: "sun", rainy: false };
@@ -50,16 +54,17 @@ export async function getWeather(lat: number, lng: number): Promise<Weather | nu
   try {
     const d = await getJson(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
-        "&current=temperature_2m,weather_code" +
-        "&hourly=temperature_2m,weather_code,precipitation_probability&forecast_hours=13" +
+        "&current=temperature_2m,weather_code,uv_index" +
+        "&hourly=temperature_2m,weather_code,precipitation_probability,uv_index&forecast_hours=13" +
         "&daily=sunrise,sunset&forecast_days=1&timezone=America%2FLima",
     );
     const code = Number(d.current.weather_code);
-    const h = d.hourly as { time: string[]; temperature_2m: number[]; weather_code: number[]; precipitation_probability: (number | null)[] };
+    const h = d.hourly as { time: string[]; temperature_2m: number[]; weather_code: number[]; precipitation_probability: (number | null)[]; uv_index?: (number | null)[] };
     const hours: HourForecast[] = h.time.map((t, i) => ({
       hour: t.slice(11, 13) + "h",
       temp: Math.round(h.temperature_2m[i]),
       rainProb: h.precipitation_probability[i] ?? 0,
+      uv: h.uv_index?.[i] ?? 0,
       ...describe(Number(h.weather_code[i])),
     }));
     return {
@@ -67,6 +72,8 @@ export async function getWeather(lat: number, lng: number): Promise<Weather | nu
       code,
       ...describe(code),
       next: [3, 6, 9, 12].map((k) => hours[k]).filter(Boolean),
+      uvNow: Number(d.current.uv_index ?? hours[0]?.uv ?? 0),
+      hours,
       rainSoon: hours.slice(0, 4).some((x) => x.rainProb >= 50),
       sunrise: String(d.daily.sunrise[0]).slice(11, 16),
       sunset: String(d.daily.sunset[0]).slice(11, 16),
@@ -79,9 +86,9 @@ export async function getWeather(lat: number, lng: number): Promise<Weather | nu
 export async function getAir(lat: number, lng: number): Promise<Air | null> {
   try {
     const d = await getJson(
-      `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=us_aqi,pm2_5&timezone=America%2FLima`,
+      `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=us_aqi,pm2_5&hourly=us_aqi&forecast_hours=13&timezone=America%2FLima`,
     );
-    return { usAqi: Math.round(d.current.us_aqi), pm25: d.current.pm2_5 };
+    return { usAqi: Math.round(d.current.us_aqi), pm25: d.current.pm2_5, hourly: ((d.hourly?.us_aqi ?? []) as (number | null)[]).map((x) => Math.round(x ?? d.current.us_aqi)) };
   } catch {
     return null;
   }

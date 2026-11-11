@@ -53,6 +53,17 @@ export type Recommendation = {
   today: Stat[];
   impact: { intro: string; stats: Stat[]; equivalences: string[] };
   quote: string;
+  goal: GoalId;
+  /** Condiciones del día traducidas a decisiones. */
+  conditions: {
+    air?: string;
+    uv?: { value: number; label: string; advice?: string };
+    bestHour?: { hour: string; why: string; now: boolean };
+    /** Qué cambió en la recomendación por el clima o el aire. */
+    effect: string;
+  };
+  /** Movimiento del tramo (si caminas o pedaleas). */
+  body: { mode: "walk" | "bike"; recommended: boolean; activeMin: number; weeklyPct: number; steps?: number; kcal: number };
   path: { lat: number; lng: number; name: string }[];
   live: boolean;
 };
