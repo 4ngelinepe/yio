@@ -6,12 +6,17 @@
  * - Expreso San Isidro (Municipalidad de San Isidro): zenbus.net, snapshot 11 nov 2026.
  *   76 paraderos, 3 rutas circulares. Gratuito y eléctrico. Llegadas en vivo vía esi-arrivals.
  *
+ * - Metro de Lima Línea 1: estaciones de OpenStreetMap (relación 7727213, ODbL), 11 nov 2026.
+ *   26 estaciones Bayóvar–Villa El Salvador. Sin datos en vivo: espera según frecuencia publicada.
+ *
  * Azul y Morado: sin coordenadas públicas todavía (ver bus-routes.ts y portal ATU).
  */
 import rojoRaw from "./rojo.json";
 import esiRaw from "./esi.json";
+import metroRaw from "./metro.json";
 
-export type NetworkId = "rojo" | "esi";
+export type NetworkId = "rojo" | "esi" | "metro";
+type Range = [number, number];
 
 export type Stop = { id: string; name: string; place: string; lat: number; lng: number };
 
@@ -36,6 +41,17 @@ export type Network = {
   source: string;
   stops: Record<string, Stop>;
   routes: Route[];
+  /** Cómo se nombra en las frases: "el Rojo", "el Metro". */
+  busName: string;
+  kind: "bus" | "rail";
+  /** Velocidad promedio con paradas, km/h: [hora punta, resto]. */
+  speedKmh: Range;
+  /** Espera estimada cuando no hay dato en vivo, minutos. */
+  wait: { peak: Range; off: Range; note: string };
+  /** Horario de servicio (hora de Lima "HH:MM"). */
+  hours?: { weekday: [string, string]; sunday: [string, string]; label: string };
+  /** Aviso fijo para la opción de esta red. */
+  rule?: string;
 };
 
 export type Trip = { route: Route; stopIds: string[]; fromIndex: number };
@@ -114,6 +130,10 @@ export const ROJO: Network = {
   source: "https://app.corredorrojo.pe/",
   stops: buildStops(rojoRaw.stops as unknown as Record<string, [string, number, number]>, rojoPlace),
   routes: rojoRoutes,
+  busName: "el Rojo",
+  kind: "bus",
+  speedKmh: [11, 17],
+  wait: { peak: [3, 8], off: [4, 12], note: "Espera estimada según la hora" },
 };
 
 /* ───────── Expreso San Isidro ───────── */
@@ -145,9 +165,41 @@ export const ESI: Network = {
   source: "https://zenbus.net/publicapp/limasanisidromibus77868410",
   stops: buildStops(esiRaw.stops as unknown as Record<string, [string, number, number]>, esiPlace),
   routes: esiRoutes,
+  busName: "el Expreso",
+  kind: "bus",
+  speedKmh: [11, 17],
+  wait: { peak: [15, 45], off: [15, 45], note: "Pasa cada 40–90 min: espera estimada." },
 };
 
-export const NETWORKS: Network[] = [ROJO, ESI];
+/* ───────── Metro de Lima · Línea 1 ───────── */
+
+const l1 = metroRaw.line1;
+const metroRoutes: Route[] = [
+  { key: "metro-l1-sur", code: "Línea 1", name: "Metro · Línea 1", dirLabel: "hacia Villa El Salvador", ids: l1, loop: false, primary: true },
+  { key: "metro-l1-norte", code: "Línea 1", name: "Metro · Línea 1", dirLabel: "hacia Bayóvar", ids: [...l1].reverse(), loop: false, primary: false },
+];
+
+export const METRO: Network = {
+  id: "metro",
+  name: "Metro Línea 1",
+  short: "Metro",
+  fare: 1.5,
+  electric: true,
+  live: false,
+  source: "https://www.lineauno.pe/",
+  stops: buildStops(metroRaw.stops as unknown as Record<string, [string, number, number]>, (n) => n),
+  routes: metroRoutes,
+  busName: "el Metro",
+  kind: "rail",
+  // 34.6 km en ~54 min de punta a punta.
+  speedKmh: [36, 36],
+  // Un tren cada ~3 min en hora punta y cada 6–9 min en hora valle.
+  wait: { peak: [1, 3], off: [3, 9], note: "Tren cada 3 min en hora punta y cada 6–9 min el resto: espera estimada." },
+  hours: { weekday: ["05:00", "22:00"], sunday: ["05:30", "22:00"], label: "lun–sáb 5:00–22:00, dom 5:30–22:00" },
+  rule: "No se permite subir con scooter ni vehículos eléctricos.",
+};
+
+export const NETWORKS: Network[] = [ROJO, ESI, METRO];
 export const networkById = (id: NetworkId) => NETWORKS.find((n) => n.id === id)!;
 
 /* ───────── Consultas ───────── */

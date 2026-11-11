@@ -118,24 +118,37 @@ export function recommend(input: EngineInput): Recommendation | null {
 
   // Bus de la red elegida
   const rideKm = (rideDistanceM(net, trip) * 1.05) / 1000;
-  const rideMin = (rideKm / (peak ? 11 : 17)) * 60;
+  const rideMin = (rideKm / (peak ? net.speedKmh[0] : net.speedKmh[1])) * 60;
+  // ¿La red está operando ahora? (hora de Lima)
+  const limaNow = input.now.toLocaleString("en-GB", { timeZone: "America/Lima", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+  const hm = limaNow.slice(-5);
+  const closed = !!net.hours && (() => {
+    const [a, b] = limaNow.startsWith("Sun") ? net.hours!.sunday : net.hours!.weekday;
+    return hm < a || hm >= b;
+  })();
   const eta = input.busEta && "minutes" in input.busEta ? input.busEta : null;
   const noMore = !!input.busEta && "none" in input.busEta;
   // Sin dato en vivo: espera según la hora (Rojo) o según su frecuencia real (Expreso: cada 40–90 min).
   const wait: Range = eta ? [eta.minutes, eta.minutes]
-    : net.id === "esi" ? (noMore ? [90, 120] : [15, 45]) : peak ? [3, 8] : [4, 12];
+    : noMore || closed ? [90, 120]
+    : peak ? net.wait.peak : net.wait.off;
   const fare = net.fare;
-  const busName = net.id === "rojo" ? "el Rojo" : "el Expreso";
+  const busName = net.busName;
   const bus: ModeOption = {
-    id: "bus", title: trip.route.name, subtitle: net.fare === 0 ? "Gratis" : `Ruta ${trip.route.code} · ${trip.route.dirLabel}`, icon: "bus",
-    minutes: [round(rideMin * 0.9 + wait[0] + 2), round(rideMin * 1.2 + wait[1] + 5)],
+    id: "bus", title: trip.route.name, subtitle: net.fare === 0 ? "Gratis" : `Ruta ${trip.route.code} · ${trip.route.dirLabel}`, icon: net.kind === "rail" ? "train" : "bus",
+    minutes: net.kind === "rail"
+      ? [round(rideMin * 0.95 + wait[0] + 3), round(rideMin * 1.05 + wait[1] + 5)] // sin tráfico; +acceso a la estación
+      : [round(rideMin * 0.9 + wait[0] + 2), round(rideMin * 1.2 + wait[1] + 5)],
     cost: [fare, fare],
     kcal: 0,
-    congestion: net.electric ? "Baja" : peak ? "Media" : "Baja",
-    note: noMore ? "No quedan salidas hoy en esta ruta."
-      : eta ? `${net.electric ? "Eléctrico. " : ""}${eta.source === "live" ? "Próximo bus en" : "Próxima salida programada en"} ${eta.minutes} min`
-      : net.id === "esi" ? "Eléctrico. Pasa cada 40–90 min: espera estimada."
-      : "Espera estimada según la hora",
+    congestion: net.kind === "rail" ? "Cero" : net.electric ? "Baja" : peak ? "Media" : "Baja",
+    note: [
+      closed ? `${busName.charAt(0).toUpperCase()}${busName.slice(1)} no opera a esta hora (${net.hours!.label}).`
+      : noMore ? "No quedan salidas hoy en esta ruta."
+      : eta ? `${net.electric && net.kind === "bus" ? "Eléctrico. " : ""}${eta.source === "live" ? "Próximo bus en" : "Próxima salida programada en"} ${eta.minutes} min`
+      : `${net.electric && net.kind === "bus" ? "Eléctrico. " : ""}${net.wait.note}`,
+      net.rule,
+    ].filter(Boolean).join(" "),
   };
 
   // Taxi (referencial)
@@ -200,6 +213,11 @@ export function recommend(input: EngineInput): Recommendation | null {
         : "Hoy mejor no caminar este tramo completo.";
   }
   if (!walkOk && status.level === 3 && recommended === "bus") why = "La calidad del aire no está para caminar ahora.";
+  if (recommended === "bus" && (closed || noMore)) {
+    why = closed
+      ? `Ojo: ${busName} no opera a esta hora (${net.hours!.label}). Es la mejor opción cuando vuelva a funcionar.`
+      : `Ojo: ya no quedan salidas hoy en esta ruta. Es la mejor opción para mañana.`;
+  }
 
   const rec = { walk, bike, scooter, bus }[recommended];
   const active = recommended !== "bus";
@@ -212,7 +230,7 @@ export function recommend(input: EngineInput): Recommendation | null {
   const savingsHow: string[] = active
     ? [
         `Vas ${modeName}: tu viaje cuesta S/ 0.`,
-        fare > 0 ? `Frente a ${busName}: ahorras el pasaje, ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis, así que frente a él no hay diferencia.`,
+        fare > 0 ? `Frente ${busName.startsWith("el ") ? "al " + busName.slice(3) : "a " + busName}: ahorras el pasaje, ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis, así que frente a él no hay diferencia.`,
         `Frente a un taxi (${solesRange(taxi.cost)} por ${taxiKm.toFixed(1)} km): ahorras hasta ${soles(taxi.cost[1])}.`,
       ]
     : [
@@ -228,8 +246,8 @@ export function recommend(input: EngineInput): Recommendation | null {
     createdAt: input.now.toISOString(),
     status,
     route: {
-      from: input.from, via: middle.place, to: input.to, routeLabel: trip.route.loop ? `${net.name} · ${trip.route.code}` : `${net.name} · Ruta ${trip.route.code} · ${trip.route.dirLabel}`,
-      note: `${trip.stopIds.length - 1} paraderos`,
+      from: input.from, via: middle.place, to: input.to, routeLabel: trip.route.loop ? `${net.name} · ${trip.route.code}` : net.kind === "rail" ? `${net.name} · ${trip.route.dirLabel}` : `${net.name} · Ruta ${trip.route.code} · ${trip.route.dirLabel}`,
+      note: `${trip.stopIds.length - 1} ${net.kind === "rail" ? "estaciones" : "paraderos"}`,
     },
     options: [walk, bike, scooter, bus, taxi],
     recommended,

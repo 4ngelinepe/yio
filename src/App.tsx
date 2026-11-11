@@ -157,7 +157,7 @@ export default function App() {
           const best = NETWORKS
             .map((n) => ({ n, ...nearestPlace(n, pos.coords.latitude, pos.coords.longitude) }))
             .sort((a, b) => a.meters - b.meters)[0];
-          if (!best || best.meters > 3000) return resolve("No hay paraderos de los corredores de YIO cerca de ti (a más de 3 km).");
+          if (!best || best.meters > 3000) return resolve("No hay paraderos ni estaciones de YIO cerca de ti (a más de 3 km).");
           if (best.n.id !== networkId) { setNetworkId(best.n.id); setResult(null); }
           changeFrom(best.place, best.n.id);
           resolve(`Paradero más cercano: ${best.place} (${best.n.name}), a unos ${Math.round(best.meters / 10) * 10} m.`);

@@ -6,7 +6,7 @@ import type { Tone } from "../lib/tones";
 export type GoalId = "rapido" | "ahorro" | "trafico" | "bienestar";
 export type IconName =
   | "zap" | "piggy" | "traffic" | "sparkles" | "clock" | "dollar" | "car" | "bus" | "bike" | "scooter"
-  | "alert" | "flame" | "footprints" | "wind" | "sun" | "cloud" | "rain" | "trend";
+  | "train" | "alert" | "flame" | "footprints" | "wind" | "sun" | "cloud" | "rain" | "trend";
 
 export const goals: { id: GoalId; label: string; icon: IconName }[] = [
   { id: "rapido", label: "Moverme rápido", icon: "zap" },
