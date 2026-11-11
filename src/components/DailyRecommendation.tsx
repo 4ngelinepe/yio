@@ -66,6 +66,11 @@ function StopSelect({ id, label, value, groups, placeholder, disabled, onChange 
   );
 }
 
+/** Número de paso, igual que en "¿Cómo funciona?". */
+function Step({ n }: { n: number }) {
+  return <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-primary-soft text-sm font-medium text-primary-text">{n}</span>;
+}
+
 /** Lima aproximada: el cálculo de calles solo funciona dentro de esta caja. */
 const inLima = (lat: number, lng: number) => lat > -12.6 && lat < -11.6 && lng > -77.3 && lng < -76.6;
 
@@ -201,20 +206,9 @@ export function DailyRecommendation(p: Props) {
         </div>
       )}
 
-      {/* Tramo */}
+      {/* 1 · Cómo vas */}
       <div className="mt-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg text-ink">¿Qué tramo vas a hacer?</h2>
-          {!libre && <button
-            type="button"
-            onClick={locate}
-            disabled={locating}
-            className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm text-ink hover:bg-surface-muted"
-          >
-            {locating ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
-            Paradero más cercano
-          </button>}
-        </div>
+        <h2 className="mb-4 flex items-center gap-3 text-lg text-ink"><Step n={1} />¿Cómo vas?</h2>
         <div role="radiogroup" aria-label="Cómo vas" className="mb-4 flex flex-wrap gap-2">
           <button
             type="button" role="radio" aria-checked={libre}
@@ -258,6 +252,16 @@ export function DailyRecommendation(p: Props) {
             </p>
           );
         })()}
+        <div className="mb-4 mt-6 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="flex items-center gap-3 text-lg text-ink"><Step n={2} />¿Qué tramo vas a hacer?</h2>
+          {!libre && (
+            <button type="button" onClick={locate} disabled={locating}
+              className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm text-ink hover:bg-surface-muted">
+              {locating ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
+              Paradero más cercano
+            </button>
+          )}
+        </div>
         {libre ? (
           <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto_1fr]">
             <PlaceSearch id="origin" label="Desde" value={p.origin} onChange={p.onOrigin} locate />
@@ -280,7 +284,7 @@ export function DailyRecommendation(p: Props) {
 
       {/* Objetivo */}
       <fieldset className="mt-8">
-        <legend id="goal-title" className="mb-4 text-lg text-ink">¿Qué buscas hoy?</legend>
+        <legend id="goal-title" className="mb-4 flex items-center gap-3 text-lg text-ink"><Step n={3} />¿Qué buscas hoy?</legend>
         <div className="grid gap-3 sm:grid-cols-3">
           {goals.map((g) => {
             const active = g.id === p.goal;

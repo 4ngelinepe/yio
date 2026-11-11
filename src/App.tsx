@@ -18,6 +18,7 @@ import { CumulativeImpact } from "./components/CumulativeImpact";
 import { MySavings } from "./components/MySavings";
 import { Footer } from "./components/Footer";
 import { HelpButton, ThemeSwitcher } from "./components/Floating";
+import { HowItWorks, INTRO_KEY } from "./components/HowItWorks";
 
 const LIMA = { lat: -12.0905, lng: -77.0336 }; // San Isidro, centro del corredor
 
@@ -58,6 +59,8 @@ export default function App() {
   const [saved, setSaved] = useState<SavedTrip[]>(loadLocal);
   const [email, setEmail] = useState<string | null>(null);
   const [loginOpen, setLoginOpen] = useState(false);
+  // La guía se abre sola la primera vez; después, desde el botón de ayuda.
+  const [howOpen, setHowOpen] = useState<boolean>(() => { try { return !localStorage.getItem(INTRO_KEY); } catch { return false; } });
   const [syncError, setSyncError] = useState<string | null>(null);
   const [tappId, setTappId] = useState("");
   const [online, setOnline] = useState(() => navigator.onLine);
@@ -352,7 +355,8 @@ export default function App() {
       </main>
 
       <Footer />
-      <HelpButton />
+      <HelpButton onOpen={() => setHowOpen(true)} />
+      {howOpen && !loginOpen && <HowItWorks onClose={() => setHowOpen(false)} />}
       {loginOpen && <LoginPanel onClose={() => setLoginOpen(false)} />}
       {brand.showThemeSwitcher && <ThemeSwitcher value={theme} onChange={setTheme} />}
     </div>

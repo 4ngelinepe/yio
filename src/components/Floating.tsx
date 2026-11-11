@@ -1,27 +1,16 @@
-import { useState } from "react";
 import { CircleHelp, Palette } from "lucide-react";
 import { themes, type ThemeName } from "../config/brand";
 import { cx } from "../lib/tones";
 
-/** Botón de ayuda flotante (abajo a la derecha). */
-export function HelpButton() {
-  const [open, setOpen] = useState(false);
+/** Botón de ayuda flotante (abajo a la derecha): abre "¿Cómo funciona?". */
+export function HelpButton({ onOpen }: { onOpen: () => void }) {
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
-      {open && (
-        <div role="dialog" aria-label="Ayuda" className="w-72 rounded-tile border border-line bg-surface p-4 text-sm text-muted shadow-card">
-          <p className="font-medium text-ink">¿Cómo funciona?</p>
-          <p className="mt-2">
-            Elige tu corredor (Rojo o Expreso San Isidro), tu tramo y qué buscas hoy. YIO compara caminar,
-            bici, scooter, bus y taxi con el clima y el aire de ahora, y te dice qué conviene.
-          </p>
-        </div>
-      )}
+    <div className="fixed bottom-5 right-5 z-40">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-label="Ayuda"
+        onClick={onOpen}
+        aria-label="¿Cómo funciona?"
+        title="¿Cómo funciona?"
         className="grid size-12 place-items-center rounded-full border border-line bg-surface text-ink shadow-card"
       >
         <CircleHelp className="size-6" />
