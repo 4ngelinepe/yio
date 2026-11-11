@@ -10,6 +10,7 @@ const headline = (r: Recommendation) => {
   if (rec.id === "walk") return "camina";
   if (rec.id === "bike") return "ve en bici";
   if (rec.id === "scooter") return "ve en scooter";
+  if (rec.title.startsWith("A pie + ")) return `camina y toma el ${rec.title.slice(8)}`;
   return `toma el ${rec.title}`;
 };
 

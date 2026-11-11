@@ -140,7 +140,7 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
       </div>
       <div ref={el} className="image-slot relative z-0 aspect-[4/3] sm:aspect-[16/7]" />
       <ul className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line px-6 py-3 text-xs text-muted sm:px-10" aria-label="Leyenda del mapa">
-        <li className="flex items-center gap-2"><span className={noBus ? "w-5 border-t-4 border-dotted border-primary" : "h-1 w-5 rounded-full bg-primary"} />{noBus ? "Tu ruta a pie" : `Recorrido del ${route.routeLabel.startsWith("Metro") ? "Metro" : "bus"}`}</li>
+        <li className="flex items-center gap-2"><span className={noBus ? "w-5 border-t-4 border-dotted border-primary" : "h-1 w-5 rounded-full bg-primary"} />{noBus ? "Tu ruta a pie" : `Recorrido del ${route.routeLabel.includes("Metro") ? "Metro" : "bus"}`}</li>
         {routeMode && <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-success" />Tu ruta en bici</li>}
         {bikes === "on" && <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-highlight" />{routeMode && scope === "route" ? "Ciclovía en tu ruta" : "Ciclovías de la zona"}</li>}
         {bikes === "on" && bikeCount.parking > 0 && <li className="flex items-center gap-2"><span className="size-2 rounded-full border-2 border-highlight" />Cicloparqueadero</li>}
