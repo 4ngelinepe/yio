@@ -31,6 +31,12 @@ const DAY = 86_400_000;
 const BOX = { minLon: -77.25, maxLon: -76.75, minLat: -12.45, maxLat: -11.75 };
 const FOCUS = { lat: -12.08, lon: -77.03 };
 
+/** Quita comillas sueltas y espacios de más ("Estación \"Angamos" → "Estación Angamos"). */
+const clean = (x: string) => {
+  const t = x.trim().replace(/\s+/g, " ");
+  return (t.match(/"/g) ?? []).length % 2 ? t.replace(/"/g, "").trim() : t;
+};
+
 function toPlaces(features: any[]): Place[] {
   const seen = new Set<string>();
   const out: Place[] = [];
@@ -38,12 +44,13 @@ function toPlaces(features: any[]): Place[] {
     const p = f?.properties ?? {};
     const [lng, lat] = f?.geometry?.coordinates ?? [];
     if (typeof lat !== "number" || typeof lng !== "number") continue;
-    const name: string = p.name || p.label || "";
+    const name = clean(p.name || "");
     if (!name) continue;
-    const detail = [p.neighbourhood, p.locality || p.borough, p.region !== p.locality ? p.region : null]
-      .filter((x: unknown, i: number, a: unknown[]) => x && x !== name && a.indexOf(x) === i)
-      .slice(0, 2)
-      .join(", ");
+    // Distrito y ciudad: primero de los campos sueltos, si no, de la etiqueta completa ("Larcomar, Miraflores, Lima, Peru").
+    const parts = [p.neighbourhood, p.borough, p.localadmin, p.county, p.locality, ...(String(p.label ?? "").split(","))]
+      .map((x: unknown) => clean(String(x ?? "")))
+      .filter((x: string) => x && x !== name && !/^(peru|perú)$/i.test(x));
+    const detail = [...new Set(parts)].slice(0, 2).join(", ");
     const id = `${name}|${lat.toFixed(4)}|${lng.toFixed(4)}`;
     if (seen.has(id)) continue;
     seen.add(id);
