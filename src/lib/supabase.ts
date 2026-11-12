@@ -21,6 +21,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
 export const ARRIVALS_URL = `${SUPABASE_URL}/functions/v1/rojo-arrivals`;
 export const STREET_TIMES_URL = `${SUPABASE_URL}/functions/v1/street-times`;
 export const ESI_ARRIVALS_URL = `${SUPABASE_URL}/functions/v1/esi-arrivals`;
+export const PLACES_URL = `${SUPABASE_URL}/functions/v1/places`;
 
 /** A dónde vuelve el usuario después de tocar el link del correo. */
 export const redirectUrl = () => location.origin + location.pathname;

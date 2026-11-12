@@ -32,14 +32,16 @@ flowchart LR
     EF1["Edge Function<br/>rojo-arrivals"]
     EF2["Edge Function<br/>esi-arrivals"]
     EF3["Edge Function<br/>street-times"]
+    EF4["Edge Function<br/>places"]
   end
 
   subgraph EXT["Servicios externos"]
     OM["Open-Meteo<br/>clima y aire"]
-    NO["Nominatim (OSM)<br/>buscador de lugares"]
+    NO["Nominatim (OSM)<br/>buscador de respaldo"]
     OSM["Teselas OpenStreetMap<br/>mapa"]
     BK["ArcGIS · Pedalea Seguro<br/>ciclovías"]
-    ORS["OpenRouteService<br/>rutas a pie y en bici"]
+    ORS["HeiGIT · OpenRouteService<br/>rutas a pie y en bici"]
+    PE["HeiGIT · Pelias<br/>buscador y autocompletar"]
     CR["API Corredor Rojo<br/>llegadas"]
     ZB["Zenbus<br/>Expreso San Isidro"]
     SMTP["SMTP propio<br/>correos de acceso"]
@@ -48,15 +50,16 @@ flowchart LR
   U --> P
   U --> AU
   U --> DB
-  U --> EF1 & EF2 & EF3
+  U --> EF1 & EF2 & EF3 & EF4
   U --> OM & NO & OSM & BK
   EF1 --> CR
   EF2 --> ZB
   EF3 --> ORS
+  EF4 --> PE
   AU --> SMTP
 ```
 
-**Idea central:** el frontend es estático y hace casi todo en el navegador (motor de recomendación incluido). El backend se reduce a tres piezas: **Auth, una tabla y tres puentes**. Los puentes (Edge Functions) existen para tres cosas: ocultar claves, sortear CORS y cachear para no sobrecargar las fuentes. Son también la semilla de la API de la Fase 2.
+**Idea central:** el frontend es estático y hace casi todo en el navegador (motor de recomendación incluido). El backend se reduce a tres piezas: **Auth, una tabla y cuatro puentes**. Los puentes (Edge Functions) existen para tres cosas: ocultar claves, sortear CORS y cachear para no sobrecargar las fuentes. Son también la semilla de la API de la Fase 2.
 
 ## 3. Stack
 
@@ -146,8 +149,9 @@ Una sola tabla, `public.savings`: los ahorros que cada usuario guarda. Esquema c
 | `rojo-arrivals` | paradero | próximas llegadas | API del Corredor Rojo | 20 s |
 | `esi-arrivals` | ruta (itinerario) + índice de paradero | minutos al próximo bus, en vivo o programado | Zenbus (protobuf) | 30 s |
 | `street-times` | origen y destino (lat,lng dentro de Lima) | distancia, tiempo y trazo a pie y en bici | OpenRouteService | 24 h en memoria |
+| `places` | texto (3–80 caracteres) y modo `auto` o `search` | hasta 6 lugares en Lima y Callao | HeiGIT Pelias | 24 h en memoria |
 
-- Las tres son públicas (sin JWT): solo leen datos públicos o cacheados y validan la entrada.
+- Las cuatro son públicas (sin JWT): solo leen datos públicos o cacheados y validan la entrada.
 - Si un puente falla, la app sigue funcionando con estimados (espera por frecuencia, distancia en línea recta × 1.2).
 - El código de referencia está en `supabase/functions/`. Hoy se despliegan desde el panel de Supabase; pasarlo a la CLI está en pendientes.
 
@@ -162,7 +166,8 @@ Una sola tabla, `public.savings`: los ahorros que cada usuario guarda. Esquema c
 | Tiempos y rutas a pie y en bici | OpenRouteService (HeiGIT) | Puente `street-times`, clave en secreto | Plan gratuito: 2000 consultas/día | OK |
 | Clima, UV y calidad del aire | Open-Meteo | Directo desde el navegador | Gratis para uso no comercial | Revisar licencia para la Fase 2 |
 | Ciclovías y cicloparqueaderos | Pedalea Seguro 2.0 (ArcGIS, datos Banco Mundial 2023) | Directo desde el navegador | Público | OK |
-| Buscador de lugares | Nominatim (OpenStreetMap) | Directo desde el navegador | 1 consulta por segundo, sin uso masivo | Reemplazar antes de crecer |
+| Buscador de lugares y autocompletar | HeiGIT Pelias | Puente `places`, misma clave ORS_KEY | Plan gratuito: 1000 búsquedas y 1000 autocompletados al día | OK |
+| Buscador de respaldo | Nominatim (OpenStreetMap) | Directo desde el navegador, solo si `places` falla | 1 consulta por segundo, sin autocompletar | Solo respaldo |
 | Mapa base | Teselas de OpenStreetMap | Directo desde el navegador | Uso moderado, con atribución | Reemplazar antes de crecer |
 
 > Los datos del Corredor Rojo y de Zenbus se usan de forma moderada y personal en la Fase 1. Antes de cualquier uso comercial o de crecer el número de usuarios, se pedirá autorización formal a la ATU y a la Municipalidad de San Isidro.
@@ -187,7 +192,8 @@ sequenceDiagram
       SB->>X: OpenRouteService (cache 24 h)
     end
   else Por dirección
-    W->>X: Nominatim (buscar origen y destino)
+    W->>SB: places (autocompletar origen y destino)
+    SB->>X: HeiGIT Pelias (cache 24 h)
     W->>SB: street-times (dirección a dirección)
     W->>W: Busca combinados en las redes cargadas
   end
@@ -219,7 +225,8 @@ Para correr el proyecto en local: `npm install` y `npm run dev` (http://localhos
 | Contraseña de la base de datos | Solo con la dueña del proyecto | No |
 
 Datos personales que guarda YIO: correo (Auth) y el historial de ahorros (lugares de origen y destino por nombre, modo, monto y calorías estimadas).
-- **Ubicación:** el origen y el destino viajan a `street-times` (y de ahí a OpenRouteService) y el texto buscado a Nominatim, solo para calcular la ruta. No se guardan coordenadas en la base.
+- **Ubicación:** el origen y el destino viajan a `street-times` (y de ahí a OpenRouteService) y el texto buscado a `places` (y a Pelias), solo para calcular la ruta. No se guardan coordenadas en la base.
+- **Casa, Trabajo y lugares recientes:** se guardan solo en el dispositivo (localStorage), nunca en la nube.
 - **Salud:** no se guarda nada de salud. Las calorías son un estimado del tramo, no un dato de la persona.
 
 ## 10. Costos
@@ -233,7 +240,7 @@ Lo primero que costaría al crecer: buscador y mapa propios (o de pago), Supabas
 | Tema | Impacto | Qué hacer |
 |---|---|---|
 | Datos del Rojo y de Zenbus sin autorización formal | Bloquea la Fase 2 | Cartas a la ATU y a la Municipalidad de San Isidro |
-| Nominatim y teselas de OSM con límites de uso | No escalan | Geocodificador y mapa propios o de pago |
+| Teselas de OSM con límites de uso | No escalan | Mapa de pago (por ejemplo, Stadia Maps) o propio |
 | Sin tests automatizados | Riesgo de regresiones en el motor | Tests del motor con tramos reales |
 | Sin medición de uso | No se sabe si la app sirve | Métricas anónimas (pendiente inmediato) |
 | Edge Functions desplegadas a mano | El panel puede desalinearse del repo | Desplegar con la CLI de Supabase desde Actions |
@@ -242,8 +249,8 @@ Lo primero que costaría al crecer: buscador y mapa propios (o de pago), Supabas
 
 ## 12. Hoja de ruta
 
-**Fase 1, próximo:** lugares guardados (Casa, Trabajo), botón de comentarios, métricas anónimas de uso, Metropolitano y Línea 2, mapa del combinado por tramos.
+**Fase 1, próximo:** botón de comentarios, métricas anónimas de uso, Metropolitano y Línea 2, mapa del combinado por tramos.
 
-**Antes de crecer:** autorizaciones, buscador y mapa propios, transbordos, huella de CO₂ con fuente citada.
+**Antes de crecer:** autorizaciones, mapa de pago o propio, transbordos, huella de CO₂ con fuente citada.
 
 **Fase 2:** los puentes pasan a ser una API documentada (recomendación, ahorro, llegadas) y se suma un widget de marca blanca para billeteras, usando el sistema de tokens que ya existe.

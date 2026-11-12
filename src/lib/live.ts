@@ -7,7 +7,7 @@
  *   Si no responden, YIO usa frecuencias estimadas.
  */
 import type { IconName } from "../data/content";
-import { ARRIVALS_URL, ESI_ARRIVALS_URL, STREET_TIMES_URL } from "./supabase";
+import { ARRIVALS_URL, ESI_ARRIVALS_URL, PLACES_URL, STREET_TIMES_URL } from "./supabase";
 import type { Network, Trip } from "../data/networks";
 
 export type HourForecast = { hour: string; temp: number; label: string; icon: IconName; rainProb: number; uv: number };
@@ -147,11 +147,25 @@ export async function getStreetTimes(a: { lat: number; lng: number }, b: { lat: 
   }
 }
 
-/* ───────── Buscador de lugares (OpenStreetMap · Nominatim) ───────── */
+/* ───────── Buscador de lugares ───────── */
 export type FoundPlace = { name: string; detail: string; lat: number; lng: number };
 
-/** Busca direcciones y lugares dentro de Lima. Se llama al enviar, no letra por letra. */
-export async function searchPlaces(q: string): Promise<FoundPlace[]> {
+/**
+ * Busca lugares en Lima.
+ * - Primero en el puente `places` (HeiGIT Pelias): permite autocompletar.
+ * - Si el puente falla y es una búsqueda completa, cae a Nominatim (OSM).
+ *   Nominatim no permite autocompletar, así que en modo "auto" sin puente devuelve null.
+ */
+export async function searchPlaces(q: string, mode: "auto" | "search" = "search"): Promise<FoundPlace[] | null> {
+  try {
+    const d = (await getJson(`${PLACES_URL}?${new URLSearchParams({ q, mode })}`, mode === "auto" ? 3500 : 5000)) as { places?: FoundPlace[] };
+    if (Array.isArray(d.places)) return d.places;
+  } catch { /* sigue con el plan B */ }
+  if (mode === "auto") return null;
+  return searchNominatim(q);
+}
+
+async function searchNominatim(q: string): Promise<FoundPlace[]> {
   const url = "https://nominatim.openstreetmap.org/search?" + new URLSearchParams({
     format: "jsonv2", q, countrycodes: "pe", viewbox: "-77.25,-11.75,-76.75,-12.45", bounded: "1", limit: "6", "accept-language": "es",
   });

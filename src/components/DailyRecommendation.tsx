@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
-import { ArrowDown, Bike, Loader2, LocateFixed, MapPin, Scooter, Search, X } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { ArrowDown, Bike, Briefcase, History, Home, Loader2, LocateFixed, MapPin, Scooter, Search, X } from "lucide-react";
+import { loadSaved, remember, setSlot, slotOf, type SavedPlaces, type SlotId } from "../lib/places";
 import { goals, type GoalId } from "../data/content";
 import type { Network, NetworkId, Place, PlaceGroup } from "../data/networks";
 import { searchPlaces, type Air, type FoundPlace, type Weather } from "../lib/live";
@@ -75,21 +76,46 @@ function Step({ n }: { n: number }) {
 /** Lima aproximada: el cálculo de calles solo funciona dentro de esta caja. */
 const inLima = (lat: number, lng: number) => lat > -12.6 && lat < -11.6 && lng > -77.3 && lng < -76.6;
 
-function PlaceSearch({ id, label, value, onChange, locate }: {
+function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
   id: string; label: string; value: Place | null; onChange: (p: Place | null) => void; locate?: boolean;
+  saved: SavedPlaces; onSaved: (s: SavedPlaces) => void;
 }) {
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<"search" | "gps" | null>(null);
   const [found, setFound] = useState<FoundPlace[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [empty, setEmpty] = useState(false);
+  const seq = useRef(0);
+
+  // Autocompletar: sugerencias mientras escribes (si el puente del buscador responde).
+  useEffect(() => {
+    const text = q.trim();
+    if (text.length < 3) { setFound(null); setEmpty(false); return; }
+    const n = ++seq.current;
+    const t = setTimeout(async () => {
+      const r = await searchPlaces(text, "auto");
+      if (n !== seq.current || r === null) return;
+      setFound(r);
+      setEmpty(false);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const pick = (pl: Place) => {
+    seq.current++;
+    onChange(pl);
+    onSaved(remember(saved, pl));
+    setFound(null); setQ(""); setEmpty(false); setMsg(null);
+  };
 
   const search = async (e: FormEvent) => {
     e.preventDefault();
     if (q.trim().length < 3) { setMsg("Escribe al menos 3 letras."); return; }
-    setBusy("search"); setMsg(null); setFound(null); setEmpty(false);
+    const n = ++seq.current;
+    setBusy("search"); setMsg(null); setEmpty(false);
     try {
-      const r = await searchPlaces(q.trim());
+      const r = (await searchPlaces(q.trim(), "search")) ?? [];
+      if (n !== seq.current) return;
       setFound(r);
       setEmpty(!r.length);
     } catch { setMsg("No pudimos buscar ahora. Revisa tu conexión."); }
@@ -112,41 +138,71 @@ function PlaceSearch({ id, label, value, onChange, locate }: {
   };
 
   if (value) {
+    const slot = slotOf(saved, value);
     return (
       <div>
         <p className="mb-1.5 text-sm text-muted">{label}</p>
         <div className="flex items-center gap-3 rounded-tile border-2 border-primary bg-primary-soft px-4 py-3 text-lg text-primary-text">
-          <MapPin className="size-5 shrink-0" aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{value.name}</span>
+          {slot === "casa" ? <Home className="size-5 shrink-0" aria-hidden /> : slot === "trabajo" ? <Briefcase className="size-5 shrink-0" aria-hidden /> : <MapPin className="size-5 shrink-0" aria-hidden />}
+          <span className="min-w-0 flex-1 truncate">{slot ? `${slot === "casa" ? "Casa" : "Trabajo"} · ` : ""}{value.name}</span>
           <button type="button" onClick={() => { onChange(null); setFound(null); }} aria-label={`Cambiar ${label.toLowerCase()}`}
             className="rounded-full p-1 hover:bg-surface-muted"><X className="size-4" /></button>
         </div>
+        {!slot && value.name !== "Mi ubicación" && (
+          <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
+            Guardar como:
+            {(["casa", "trabajo"] as SlotId[]).map((sl) => (
+              <button key={sl} type="button" onClick={() => onSaved(setSlot(saved, sl, value))}
+                className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-ink hover:bg-surface-muted">
+                {sl === "casa" ? <Home className="size-3.5" /> : <Briefcase className="size-3.5" />}
+                {sl === "casa" ? "Casa" : "Trabajo"}{saved[sl] ? " (reemplaza)" : ""}
+              </button>
+            ))}
+          </p>
+        )}
       </div>
     );
   }
 
+  const chips: { key: string; label: string; icon: React.ReactNode; place: Place }[] = [
+    ...(saved.casa ? [{ key: "casa", label: "Casa", icon: <Home className="size-4" />, place: saved.casa }] : []),
+    ...(saved.trabajo ? [{ key: "trabajo", label: "Trabajo", icon: <Briefcase className="size-4" />, place: saved.trabajo }] : []),
+    ...saved.recent.map((r, k) => ({ key: `r${k}`, label: r.name, icon: <History className="size-4" />, place: r })),
+  ];
+
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-sm text-muted">{label}</label>
-      <form onSubmit={search} className="flex gap-2">
+      <form onSubmit={search} className="flex gap-2" role="search">
         <input id={id} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Calle, lugar o distrito" autoComplete="off"
+          aria-autocomplete="list" aria-controls={`${id}-list`}
           className="min-w-0 flex-1 rounded-tile border-2 border-line bg-surface-muted px-4 py-3 text-lg text-ink placeholder:text-subtle focus:border-primary" />
         <button type="submit" disabled={!!busy} aria-label="Buscar"
           className="rounded-tile border-2 border-line px-3 text-ink hover:bg-surface-muted">
           {busy === "search" ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-5" />}
         </button>
       </form>
-      {locate && (
-        <button type="button" onClick={gps} disabled={!!busy}
-          className="mt-2 inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-muted">
-          {busy === "gps" ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />} Mi ubicación
-        </button>
+      {!q && (locate || chips.length > 0) && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {locate && (
+            <button type="button" onClick={gps} disabled={!!busy}
+              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-muted">
+              {busy === "gps" ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />} Mi ubicación
+            </button>
+          )}
+          {chips.map((c) => (
+            <button key={c.key} type="button" onClick={() => pick(c.place)}
+              className="inline-flex max-w-[14rem] items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-muted">
+              {c.icon}<span className="truncate">{c.label}</span>
+            </button>
+          ))}
+        </div>
       )}
       {found && found.length > 0 && (
-        <ul className="mt-2 divide-y divide-line overflow-hidden rounded-tile border border-line" aria-label="Resultados">
+        <ul id={`${id}-list`} className="mt-2 divide-y divide-line overflow-hidden rounded-tile border border-line" aria-label="Resultados">
           {found.map((f, i) => (
             <li key={i}>
-              <button type="button" onClick={() => { onChange({ name: f.name, lat: f.lat, lng: f.lng }); setFound(null); setQ(""); }}
+              <button type="button" onClick={() => pick({ name: f.name, lat: f.lat, lng: f.lng })}
                 className="w-full px-4 py-2.5 text-left hover:bg-surface-muted">
                 <span className="block text-ink">{f.name}</span>
                 {f.detail && <span className="block text-xs text-muted">{f.detail}</span>}
@@ -160,7 +216,7 @@ function PlaceSearch({ id, label, value, onChange, locate }: {
           <VentanaReja className="size-8 shrink-0 text-primary" />
           <p className="text-sm text-muted">
             <span className="block text-ink">No encontramos ese lugar en Lima.</span>
-            Prueba con la calle y el número, o con un lugar conocido. Las esquinas ("Aviación con Angamos") todavía no las entiende.
+            Prueba con la calle y el número, o con un lugar conocido.
           </p>
         </div>
       )}
@@ -170,6 +226,7 @@ function PlaceSearch({ id, label, value, onChange, locate }: {
 }
 
 export function DailyRecommendation(p: Props) {
+  const [saved, setSaved] = useState<SavedPlaces>(loadSaved);
   const libre = p.networkId === "libre";
   const ready = libre ? !!p.origin && !!p.dest : !!p.from && !!p.to;
   const [locating, setLocating] = useState(false);
@@ -275,9 +332,9 @@ export function DailyRecommendation(p: Props) {
         </div>
         {libre ? (
           <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto_1fr]">
-            <PlaceSearch id="origin" label="Desde" value={p.origin} onChange={p.onOrigin} locate />
+            <PlaceSearch id="origin" label="Desde" value={p.origin} onChange={p.onOrigin} locate saved={saved} onSaved={setSaved} />
             <ArrowDown className="mx-auto mt-2 size-5 text-subtle sm:mt-11 sm:-rotate-90" aria-hidden />
-            <PlaceSearch id="dest" label="Hasta" value={p.dest} onChange={p.onDest} />
+            <PlaceSearch id="dest" label="Hasta" value={p.dest} onChange={p.onDest} saved={saved} onSaved={setSaved} />
           </div>
         ) : (
         <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
