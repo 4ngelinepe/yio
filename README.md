@@ -1,21 +1,20 @@
 # YIO
 
-**Por el bienestar común.** ¿Camino, bici o bus? YIO compara caminar, bici, scooter, el bus del corredor y el taxi para tu tramo, con el clima y el aire de ahora, y te dice qué conviene según lo que buscas hoy: moverte rápido, ahorrar, evitar tráfico o sentirte mejor.
+**Por el bienestar común.** ¿Camino, bici o bus? YIO compara caminar, bici, scooter, bus o Metro y el taxi para tu tramo, con el clima, el aire y la hora punta de ahora, y te dice qué conviene según lo que buscas hoy: **llegar rápido, ahorrar plata o moverte más**.
 
-**Demo en vivo:** https://4ngelinepe.github.io/yio/
+**Demo en vivo:** https://4ngelinepe.github.io/yio/ · **Arquitectura completa:** [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md)
 
-Fase 1: uso personal y con amigos. Corredores: Corredor Rojo y Expreso San Isidro. (Antes `geo-wireframe-mvp`; si encuentras ese nombre en algún lado, es el mismo proyecto.)
+Fase 1: uso personal y con amigos. (Antes `geo-wireframe-mvp`; es el mismo proyecto.)
 
 ## Qué hace hoy
 
-- Corredor Rojo: 144 paraderos (rutas 201, 204, 206, 209), con llegadas en vivo.
-- Expreso San Isidro: 3 rutas circulares, gratuito y eléctrico (sin llegadas en vivo aún).
-- Bici y scooter propios como opciones; app instalable con modo offline.
-- Recomendación caminar vs. bus con reglas transparentes (ver `src/lib/engine.ts`). El taxi se usa solo como referencia de ahorro.
-- Clima y calidad del aire en vivo (Open-Meteo).
-- Llegadas del bus en vivo vía intermediarios (`supabase/functions/rojo-arrivals` y `esi-arrivals`); si no responden, usa espera estimada.
-- Mapa del tramo (Leaflet + OpenStreetMap).
-- Login sin contraseña (link al correo) y "Mis ahorros" en la nube con Supabase. Sin sesión, se guarda en el dispositivo.
+- **Dos modos:** por corredor (Corredor Rojo, Expreso San Isidro, Metro Línea 1) o **por dirección** (a pie, en bici o combinado: a pie + bus o Metro).
+- Llegadas en vivo del Rojo y del Expreso; tiempos reales a pie y en bici por calles (OpenRouteService).
+- Clima, UV y calidad del aire en vivo (Open-Meteo); hora punta; modo día/noche según la hora.
+- Ruta en bici con el % que va sobre ciclovía (Pedalea Seguro 2.0).
+- Login sin contraseña y "Mis ahorros" en la nube (Supabase). Sin sesión, se guarda en el dispositivo.
+- App instalable con modo sin conexión. Guía "¿Cómo funciona?" para usuarios nuevos.
+- Iconografía limeña por Alfabeto Visual.
 
 ## Correr el proyecto
 
@@ -38,6 +37,9 @@ Cada push a `main` se publica solo en GitHub Pages (`.github/workflows/deploy.ym
 | Llegadas en vivo · Rojo | API del Rojo vía Edge Function | `supabase/functions/rojo-arrivals` |
 | Tiempos a pie y en bici | OpenRouteService (OpenStreetMap) vía Edge Function, clave en secreto ORS_KEY | `supabase/functions/street-times` |
 | Llegadas en vivo · Expreso | Zenbus (protobuf) vía Edge Function, con horario programado de respaldo | `supabase/functions/esi-arrivals` |
+| Estaciones del Metro Línea 1 | OpenStreetMap | `src/data/metro.json` |
+| Ciclovías y cicloparqueaderos | Pedalea Seguro 2.0 (ArcGIS) | `src/lib/bikes.ts` |
+| Buscador de lugares | Nominatim (OpenStreetMap) | `src/lib/live.ts` |
 
 El API del Rojo y los datos de Zenbus no son públicos para terceros: el uso en Fase 1 es moderado y personal. Antes de cualquier uso comercial, pedir permiso a la ATU/operador y a la Municipalidad de San Isidro.
 
