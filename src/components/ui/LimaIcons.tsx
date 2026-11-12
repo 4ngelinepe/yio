@@ -1,7 +1,7 @@
 /**
  * Iconografía limeña · versión YIO.
  * Derivada del set "Iconografía limeña" de Alfabeto Visual (Figma: Fachadas de lima › YIO).
- * Trazo de 2 px y color heredado (currentColor). Solo para momentos de identidad:
+ * Trazo de 1.5 px (más fino que los funcionales de lucide, 1.75) y color heredado (currentColor). Solo para momentos de identidad:
  * día/noche y carga, bienvenida y estados vacíos, sin conexión, llegada y logros. Los íconos funcionales siguen con lucide.
  */
 import type { SVGProps } from "react";
@@ -11,7 +11,7 @@ type P = SVGProps<SVGSVGElement> & { title?: string };
 function Base({ title, children, ...rest }: P & { children: React.ReactNode }) {
   return (
     <svg
-      viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth={2}
+      viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth={1.5}
       strokeLinecap="round" strokeLinejoin="round" role={title ? "img" : undefined}
       aria-hidden={title ? undefined : true} aria-label={title} {...rest}
     >
