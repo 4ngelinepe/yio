@@ -19,6 +19,7 @@ import { MySavings } from "./components/MySavings";
 import { Footer } from "./components/Footer";
 import { HelpButton, ThemeSwitcher } from "./components/Floating";
 import { HowItWorks, INTRO_KEY } from "./components/HowItWorks";
+import { PuertaTallada } from "./components/ui/LimaIcons";
 
 const LIMA = { lat: -12.0905, lng: -77.0336 }; // San Isidro, centro del corredor
 
@@ -296,7 +297,8 @@ export default function App() {
         dark={dark} modeAuto={modePref === "auto"} onToggleMode={toggleMode} />
 
       {!online && (
-        <p role="status" className="bg-warning-soft px-4 py-2 text-center text-sm text-warning-text">
+        <p role="status" className="flex items-center justify-center gap-2 bg-warning-soft px-4 py-2 text-center text-sm text-warning-text">
+          <PuertaTallada className="size-5 shrink-0" />
           Sin conexión: YIO usa tiempos estimados y guarda tus ahorros para subirlos cuando vuelva la señal.
         </p>
       )}

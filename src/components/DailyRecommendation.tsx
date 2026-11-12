@@ -6,6 +6,7 @@ import { searchPlaces, type Air, type FoundPlace, type Weather } from "../lib/li
 import { cx } from "../lib/tones";
 import { aqiLabel, isPeak, PEAK_LABEL } from "../lib/engine";
 import { Icon } from "./ui/Icon";
+import { Farol, VentanaReja } from "./ui/LimaIcons";
 import { Button, Card } from "./ui/primitives";
 
 type Props = {
@@ -81,15 +82,16 @@ function PlaceSearch({ id, label, value, onChange, locate }: {
   const [busy, setBusy] = useState<"search" | "gps" | null>(null);
   const [found, setFound] = useState<FoundPlace[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [empty, setEmpty] = useState(false);
 
   const search = async (e: FormEvent) => {
     e.preventDefault();
     if (q.trim().length < 3) { setMsg("Escribe al menos 3 letras."); return; }
-    setBusy("search"); setMsg(null); setFound(null);
+    setBusy("search"); setMsg(null); setFound(null); setEmpty(false);
     try {
       const r = await searchPlaces(q.trim());
       setFound(r);
-      if (!r.length) setMsg("No encontramos ese lugar en Lima. Prueba con la calle y el distrito.");
+      setEmpty(!r.length);
     } catch { setMsg("No pudimos buscar ahora. Revisa tu conexión."); }
     setBusy(null);
   };
@@ -152,6 +154,15 @@ function PlaceSearch({ id, label, value, onChange, locate }: {
             </li>
           ))}
         </ul>
+      )}
+      {empty && (
+        <div className="mt-3 flex items-center gap-3 rounded-tile border border-dashed border-line px-4 py-3" role="status">
+          <VentanaReja className="size-8 shrink-0 text-primary" />
+          <p className="text-sm text-muted">
+            <span className="block text-ink">No encontramos ese lugar en Lima.</span>
+            Prueba con la calle y el número, o con un lugar conocido. Las esquinas ("Aviación con Angamos") todavía no las entiende.
+          </p>
+        </div>
       )}
       {msg && <p className="mt-2 text-sm text-muted">{msg}</p>}
     </div>
@@ -326,7 +337,7 @@ export function DailyRecommendation(p: Props) {
           className="w-full sm:w-auto sm:px-10"
           onClick={p.onCalculate}
           disabled={p.loading || !ready}
-          icon={p.loading ? <Loader2 className="size-5 animate-spin" /> : null}
+          icon={p.loading ? <Farol lit className="size-5 motion-safe:animate-pulse" /> : null}
         >
           {p.loading ? "Calculando…" : "Calcular recomendación"}
         </Button>

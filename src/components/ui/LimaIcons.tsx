@@ -1,8 +1,8 @@
 /**
  * Iconografía limeña · versión YIO.
  * Derivada del set "Iconografía limeña" de Alfabeto Visual (Figma: Fachadas de lima › YIO).
- * Trazo de 2 px y color heredado (currentColor). Solo para momentos emocionales:
- * día/noche, bienvenida y estados vacíos, llegada y logros. Los íconos funcionales siguen con lucide.
+ * Trazo de 2 px y color heredado (currentColor). Solo para momentos de identidad:
+ * día/noche y carga, bienvenida y estados vacíos, sin conexión, llegada y logros. Los íconos funcionales siguen con lucide.
  */
 import type { SVGProps } from "react";
 
@@ -60,5 +60,21 @@ export const Venera = (p: P) => (
 export const RemateDeco = (p: P) => (
   <Base {...p}>
     <path d="M5 21V9h3V6h2V3h4v3h2v3h3v12" /><path d="M12 3v5" /><path d="M8.5 12h7v6h-7z" /><path d="M12 12v6" />
+  </Base>
+);
+
+/** Ventana con reja: 2 barrotes (versión YIO). Uso: búsqueda sin resultados. */
+export const VentanaReja = (p: P) => (
+  <Base {...p}>
+    <path d="M7.5 4.5c1.5-1.7 3-1.7 4.5 0c1.5-1.7 3-1.7 4.5 0" />
+    <path d="M6 20V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v12" /><path d="M10 7v13M14 7v13" /><path d="M6 12h12" /><path d="M4 20h16" />
+  </Base>
+);
+
+/** Puerta tallada: molduras de una línea (versión YIO). Uso: sin conexión. */
+export const PuertaTallada = (p: P) => (
+  <Base {...p}>
+    <path d="M6 20V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14" /><path d="M12 4v16" />
+    <path d="M9 7.5v4.5M15 7.5v4.5" /><path d="M9 15v2M15 15v2" /><path d="M4 20h16" />
   </Base>
 );
