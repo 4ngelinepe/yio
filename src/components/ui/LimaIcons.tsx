@@ -78,3 +78,19 @@ export const PuertaTallada = (p: P) => (
     <path d="M9 7.5v4.5M15 7.5v4.5" /><path d="M9 15v2M15 15v2" /><path d="M4 20h16" />
   </Base>
 );
+
+/** Huaca de adobe escalonada en terrazas, con adobes "en librero" (Pucllana, Huallamarca). */
+export const Huaca = (p: P) => (
+  <Base {...p}>
+    <path d="M2 20h20" /><path d="M3 20v-3h3v-3h3v-3h6v3h3v3h3v3" />
+    <path d="M6 18v.5M9 18v.5M12 18v.5M15 18v.5M18 18v.5M10.5 15v.5M13.5 15v.5" />
+  </Base>
+);
+
+/** Cactus columnar San Pedro: tres tallos que nacen del suelo. */
+export const Cactus = (p: P) => (
+  <Base {...p}>
+    <path d="M10 21V5a2 2 0 0 1 4 0v16" /><path d="M5.5 21v-8.5a1.5 1.5 0 0 1 3 0V21" />
+    <path d="M15.5 21v-6a1.5 1.5 0 0 1 3 0v6" /><path d="M12 5.5v4M12 12v5" /><path d="M4 21h16" />
+  </Base>
+);
