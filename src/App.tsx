@@ -59,6 +59,8 @@ export default function App() {
     return { type: "sedan", parking: 0 };
   });
   useEffect(() => { try { localStorage.setItem("yio.car", JSON.stringify(car)); } catch { /* noop */ } }, [car]);
+  const [roundTrip, setRoundTrip] = useState<boolean>(() => { try { return localStorage.getItem("yio.roundTrip") !== "0"; } catch { return true; } });
+  useEffect(() => { try { localStorage.setItem("yio.roundTrip", roundTrip ? "1" : "0"); } catch { /* noop */ } }, [roundTrip]);
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
   const [weather, setWeather] = useState<Weather | null>(null);
   const [bikeCov, setBikeCov] = useState<BikeCoverage | null>(null);
@@ -205,7 +207,7 @@ export default function App() {
       if (!origin || !dest) { setLoading(false); return; }
       const fnet = freeNetwork(origin, dest);
       const streets = await getStreetTimes(origin, dest);
-      r = recommend({ network: fnet, from: fnet.stops.A.place, to: fnet.stops.B.place, goal, now: new Date(), weather, air, busEta: null, streets, hasBike, hasScooter, usual, car });
+      r = recommend({ network: fnet, from: fnet.stops.A.place, to: fnet.stops.B.place, goal, now: new Date(), weather, air, busEta: null, streets, hasBike, hasScooter, usual, car, roundTrip });
     } else {
       const trip = findTrip(net, from, to);
       const [busEta, streets] = trip
@@ -214,7 +216,7 @@ export default function App() {
             getStreetTimes(net.stops[trip.stopIds[0]], net.stops[trip.stopIds[trip.stopIds.length - 1]]),
           ])
         : [null, null];
-      r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, streets, hasBike, hasScooter, usual, car });
+      r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, streets, hasBike, hasScooter, usual, car, roundTrip });
     }
     setResult(r);
     setBikeCov(null);
@@ -256,7 +258,7 @@ export default function App() {
       route: result.noBus ? undefined : result.options.find((o) => o.id === "bus")?.title,
       km: result.km,
       amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
-      kcal: rec.kcal,
+      kcal: rec.kcal * (result.roundTrip ? 2 : 1),
     };
     if (!email) {
       setSaved((list) => [trip, ...list]);
@@ -337,6 +339,8 @@ export default function App() {
           onUsual={(v) => { setUsual(v); setResult(null); }}
           car={car}
           onCar={(v) => { setCar(v); setResult(null); }}
+          roundTrip={roundTrip}
+          onRoundTrip={(v) => { setRoundTrip(v); setResult(null); }}
           from={from}
           to={to}
           onFrom={(v) => changeFrom(v)}

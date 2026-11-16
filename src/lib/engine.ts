@@ -39,6 +39,8 @@ export type EngineInput = {
   usual?: UsualMode;
   /** Solo si usual = "auto": tipo de auto y cuánto paga de parqueo. */
   car?: CarInfo;
+  /** Ida y vuelta: el ahorro, los km y la energía se cuentan por dos; el parqueo, una sola vez. */
+  roundTrip?: boolean;
 };
 
 export type CarType = "compacto" | "sedan" | "camioneta";
@@ -381,29 +383,34 @@ export function recommend(input: EngineInput): Recommendation | null {
   // Ahorro real: contra cómo iría la persona normalmente (por defecto, bus o combi), no contra el peor caso.
   const usual: UsualMode = input.usual ?? "bus";
   const car: CarInfo = input.car ?? { type: "sedan", parking: 0 };
+  const legs = input.roundTrip ? 2 : 1;
+  const x2 = (r: Range): Range => [r[0] * legs, r[1] * legs];
   const kmpg = CAR_KMPG[car.type];
-  const fuel: Range = [(taxiKm * FUEL_PRICE[0]) / kmpg, (taxiKm * FUEL_PRICE[1]) / kmpg];
+  const fuel: Range = x2([(taxiKm * FUEL_PRICE[0]) / kmpg, (taxiKm * FUEL_PRICE[1]) / kmpg]);
   const autoCost: Range = [roundHalf(fuel[0] + car.parking), roundHalf(fuel[1] + car.parking)];
-  const baseline: Range = usual === "taxi" ? taxi.cost : usual === "auto" ? autoCost : usual === "bus" ? USUAL_BUS : [0, 0];
-  const recCost = active ? 0 : fare;
+  const taxiCost = x2(taxi.cost), busCost = x2(USUAL_BUS);
+  const baseline: Range = usual === "taxi" ? taxiCost : usual === "auto" ? autoCost : usual === "bus" ? busCost : [0, 0];
+  const recCost = (active ? 0 : fare) * legs;
+  const tramo = legs === 2 ? " ida y vuelta" : "";
+  const kmWords = `${(taxiKm * legs).toFixed(1)} km${tramo}`;
   const savings: Range = [Math.max(0, baseline[0] - recCost), Math.max(0, baseline[1] - recCost)];
 
   // Cómo se llega al ahorro de hoy, en palabras.
   const modeName = { walk: "a pie", bike: "en bici", scooter: "en scooter", bus: `en ${busName}` }[recommended];
   const baselineWords =
-    usual === "taxi" ? `Normalmente irías en taxi o app: ${solesRange(taxi.cost)} por ${taxiKm.toFixed(1)} km.`
-    : usual === "auto" ? `Normalmente irías en tu auto (${CAR_LABEL[car.type].toLowerCase()}, ~${kmpg} km por galón): ${solesRange([roundHalf(fuel[0]), roundHalf(fuel[1])])} de gasolina por ${taxiKm.toFixed(1)} km, con el galón entre ${soles(FUEL_PRICE[0])} y ${soles(FUEL_PRICE[1])} (${FUEL_SOURCE})${car.parking > 0 ? `, más ${soles(car.parking)} de parqueo` : ", sin parqueo"}. No contamos desgaste ni seguro.`
-    : usual === "bus" ? `Normalmente irías en bus o combi: un pasaje de ${solesRange(USUAL_BUS)} (referencial).`
+    usual === "taxi" ? `Normalmente irías en taxi o app: ${solesRange(taxiCost)} por ${kmWords}.`
+    : usual === "auto" ? `Normalmente irías en tu auto (${CAR_LABEL[car.type].toLowerCase()}, ~${kmpg} km por galón): ${solesRange([roundHalf(fuel[0]), roundHalf(fuel[1])])} de gasolina por ${kmWords}, con el galón entre ${soles(FUEL_PRICE[0])} y ${soles(FUEL_PRICE[1])} (${FUEL_SOURCE})${car.parking > 0 ? `, más ${soles(car.parking)} de parqueo (una vez al día)` : ", sin parqueo"}. No contamos desgaste ni seguro.`
+    : usual === "bus" ? `Normalmente irías en bus o combi: ${legs === 2 ? "dos pasajes" : "un pasaje"} de ${solesRange(USUAL_BUS)} (referencial)${legs === 2 ? `, ${solesRange(busCost)} en total` : ""}.`
     : "Normalmente irías a pie: no gastas nada.";
   const savingsHow: string[] = [
     baselineWords,
-    `Hoy vas ${modeName}: ${recCost > 0 ? `pagas ${soles(recCost)}` : "tu viaje cuesta S/ 0"}.`,
+    `Hoy vas ${modeName}${tramo}: ${recCost > 0 ? `pagas ${soles(recCost)}` : "cuesta S/ 0"}.`,
     savings[1] > 0
       ? `Ahorras ${solesRange(savings)} frente a lo de siempre.`
       : usual === "walk" && active
         ? "Ya ibas a pie: hoy no hay ahorro en plata, pero sumas actividad."
         : `Hoy no ahorras plata${recCost > 0 ? `: pagas ${soles(recCost)} a cambio de llegar antes` : ""}.`,
-    usual !== "taxi" ? `Como referencia, un taxi costaría ${solesRange(taxi.cost)}.` : null,
+    usual !== "taxi" ? `Como referencia, en taxi serían ${solesRange(taxiCost)}${tramo}.` : null,
   ].filter((x): x is string => !!x);
 
   const monthly: Range = [savings[0] * 20, savings[1] * 20];
@@ -424,7 +431,7 @@ export function recommend(input: EngineInput): Recommendation | null {
     savingsHow,
     today: [
       { label: { walk: "Duración caminando", bike: "Duración en bici", scooter: "Duración en scooter", bus: "Duración del viaje" }[recommended], value: minRange(rec.minutes), icon: "clock", tone: "info" },
-      { label: "Ahorro hoy", value: solesRange(savings), icon: "dollar", tone: "success" },
+      { label: `Ahorro hoy${tramo}`, value: solesRange(savings), icon: "dollar", tone: "success" },
       { label: "Congestión generada", value: rec.congestion, icon: "car", tone: "highlight" },
     ],
     impact: {
@@ -432,12 +439,12 @@ export function recommend(input: EngineInput): Recommendation | null {
       stats: [
         { label: "Ahorro", value: solesRange([Math.round(monthly[0]), Math.round(monthly[1])]).replace(/\.00/g, ""), icon: "dollar", tone: "success" },
         active && rec.kcal > 0
-          ? { label: "Energía", value: `≈ ${(rec.kcal * 20).toLocaleString("es-PE")} kcal`, icon: "zap", tone: "energy" }
+          ? { label: "Energía", value: `≈ ${(rec.kcal * 20 * legs).toLocaleString("es-PE")} kcal`, icon: "zap", tone: "energy" }
           : active
-          ? { label: "Viajes sin auto", value: "20 viajes", icon: "scooter", tone: "energy" }
-          : { label: "Viajes en transporte público", value: "20 viajes", icon: "bus", tone: "energy" },
+          ? { label: "Viajes sin auto", value: `${20 * legs} viajes`, icon: "scooter", tone: "energy" }
+          : { label: "Viajes en transporte público", value: `${20 * legs} viajes`, icon: "bus", tone: "energy" },
         active
-          ? { label: { walk: "Distancia caminada", bike: "Distancia en bici", scooter: "Distancia en scooter", bus: "" }[recommended], value: `≈ ${Math.round(walkKm * 20)} km`, icon: recommended === "walk" ? "footprints" : recommended === "bike" ? "bike" : "scooter", tone: "highlight" }
+          ? { label: { walk: "Distancia caminada", bike: "Distancia en bici", scooter: "Distancia en scooter", bus: "" }[recommended], value: `≈ ${Math.round(walkKm * 20 * legs)} km`, icon: recommended === "walk" ? "footprints" : recommended === "bike" ? "bike" : "scooter", tone: "highlight" }
           : { label: "Tiempo extra vs. taxi", value: `≈ ${Math.max(0, Math.round(((mid(bus.minutes) - mid(taxi.minutes)) * 20) / 60))} h al mes`, icon: "clock", tone: "highlight" },
       ],
       equivalences: [
@@ -480,7 +487,8 @@ export function recommend(input: EngineInput): Recommendation | null {
     live: !!eta && eta.source === "live",
     noBus: noBus && !viaCombo,
     tooFar: noBus && recommended === "walk" && wm > 75,
-    km: Math.round((viaCombo ? (combo!.c.walk1M + combo!.c.walk2M) / 1000 + (rideDistanceM(combo!.c.net, combo!.c.trip) * 1.05) / 1000 : active ? walkM / 1000 : rideKm) * 10) / 10,
+    roundTrip: legs === 2,
+    km: legs * Math.round((viaCombo ? (combo!.c.walk1M + combo!.c.walk2M) / 1000 + (rideDistanceM(combo!.c.net, combo!.c.trip) * 1.05) / 1000 : active ? walkM / 1000 : rideKm) * 10) / 10,
     parking: viaCombo && combo!.c.parking
       ? { lat: combo!.c.parking.lat, lng: combo!.c.parking.lng, m: combo!.c.parking.m, label: `Deja tu bici aquí: ${PARKING_TYPE[combo!.c.parking.type]} a ${combo!.c.parking.m} m de ${combo!.c.board}` }
       : boardParking && recommended === "bus"

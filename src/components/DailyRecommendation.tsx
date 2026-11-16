@@ -41,6 +41,8 @@ type Props = {
   onUsual: (v: UsualMode) => void;
   car: CarInfo;
   onCar: (v: CarInfo) => void;
+  roundTrip: boolean;
+  onRoundTrip: (v: boolean) => void;
   onCalculate: () => void;
   loading: boolean;
 };
@@ -400,7 +402,11 @@ export function DailyRecommendation(p: Props) {
           className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
           {(Object.keys(USUAL_LABEL) as UsualMode[]).map((k) => <option key={k} value={k}>{USUAL_LABEL[k]}</option>)}
         </select>
-        <span className="text-xs text-muted">El ahorro se calcula contra esto.</span>
+        <label className="inline-flex cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={p.roundTrip} onChange={(e) => p.onRoundTrip(e.target.checked)} className="size-5 accent-[var(--primary)]" />
+          Ida y vuelta
+        </label>
+        <span className="w-full text-xs text-muted">El ahorro se calcula contra esto.</span>
       </div>
       {p.usual === "auto" && (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-ink">

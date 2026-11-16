@@ -71,7 +71,9 @@ export type Recommendation = {
   noBus?: boolean;
   /** Sin bus, sin bici y más de 75 min a pie: no hay una buena opción en YIO. */
   tooFar?: boolean;
-  /** Distancia del viaje recomendado, en km. */
+  /** Si el ahorro, los km y la energía cuentan ida y vuelta. */
+  roundTrip?: boolean;
+  /** Distancia del viaje recomendado, en km (por dos si es ida y vuelta). */
   km?: number;
   /** Biciestacionamiento sugerido (bici + bus o Metro, o junto al paradero de subida). */
   parking?: { lat: number; lng: number; m: number; label: string };
