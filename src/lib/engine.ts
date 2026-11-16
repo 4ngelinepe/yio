@@ -387,13 +387,23 @@ export function recommend(input: EngineInput): Recommendation | null {
   const x2 = (r: Range): Range => [r[0] * legs, r[1] * legs];
   const kmpg = CAR_KMPG[car.type];
   const fuel: Range = x2([(taxiKm * FUEL_PRICE[0]) / kmpg, (taxiKm * FUEL_PRICE[1]) / kmpg]);
-  const autoCost: Range = [roundHalf(fuel[0] + car.parking), roundHalf(fuel[1] + car.parking)];
   const taxiCost = x2(taxi.cost), busCost = x2(USUAL_BUS);
-  const baseline: Range = usual === "taxi" ? taxiCost : usual === "auto" ? autoCost : usual === "bus" ? busCost : [0, 0];
   const recCost = (active ? 0 : fare) * legs;
   const tramo = legs === 2 ? " ida y vuelta" : "";
   const kmWords = `${(taxiKm * legs).toFixed(1)} km${tramo}`;
-  const savings: Range = [Math.max(0, baseline[0] - recCost), Math.max(0, baseline[1] - recCost)];
+  // Ahorro por tramo (sin parqueo); el total es la suma visible: ida + vuelta + parqueo.
+  const legBase: Range = usual === "taxi" ? taxi.cost : usual === "auto" ? [fuel[0] / legs, fuel[1] / legs] : usual === "bus" ? USUAL_BUS : [0, 0];
+  const legFare = active ? 0 : fare;
+  const legSav: Range = [roundHalf(Math.max(0, legBase[0] - legFare)), roundHalf(Math.max(0, legBase[1] - legFare))];
+  const park = usual === "auto" ? car.parking : 0;
+  const savings: Range = [legSav[0] * legs + park, legSav[1] * legs + park];
+  const savingsRows = legs === 2 || park > 0
+    ? [
+        { label: legs === 2 ? "Ida" : "Viaje", value: solesRange(legSav) },
+        ...(legs === 2 ? [{ label: "Vuelta", value: solesRange(legSav) }] : []),
+        ...(park > 0 ? [{ label: "Parqueo que no pagas", value: soles(park) }] : []),
+      ]
+    : undefined;
 
   // Cómo se llega al ahorro de hoy, en palabras.
   const modeName = { walk: "a pie", bike: "en bici", scooter: "en scooter", bus: `en ${busName}` }[recommended];
@@ -431,7 +441,7 @@ export function recommend(input: EngineInput): Recommendation | null {
     savingsHow,
     today: [
       { label: { walk: "Duración caminando", bike: "Duración en bici", scooter: "Duración en scooter", bus: "Duración del viaje" }[recommended], value: minRange(rec.minutes), icon: "clock", tone: "info" },
-      { label: `Ahorro hoy${tramo}`, value: solesRange(savings), icon: "dollar", tone: "success" },
+      { label: "Ahorro hoy", value: solesRange(savings), icon: "dollar", tone: "success", rows: savingsRows },
       { label: "Congestión generada", value: rec.congestion, icon: "car", tone: "highlight" },
     ],
     impact: {

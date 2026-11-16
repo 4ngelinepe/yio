@@ -61,8 +61,8 @@ export function Button({ variant = "primary", icon, className, children, ...rest
 
 /** Tile de métrica: ícono + etiqueta + valor. */
 export function StatTile({
-  label, value, icon, tone = "info", variant = "soft",
-}: { label: string; value: string; icon: IconName; tone?: Tone; variant?: "soft" | "plain" }) {
+  label, value, icon, tone = "info", variant = "soft", rows,
+}: { label: string; value: string; icon: IconName; tone?: Tone; variant?: "soft" | "plain"; rows?: { label: string; value: string }[] }) {
   const t = tones[tone];
   return (
     <div
@@ -75,7 +75,23 @@ export function StatTile({
         <IconTile icon={icon} tone={tone} size="sm" />
         <span className={cx("text-sm", variant === "soft" ? t.text : "text-muted")}>{label}</span>
       </div>
-      <p className={cx("mt-3 text-xl font-medium", t.text)}>{value}</p>
+      {rows?.length ? (
+        // Desglose tipo boleta: cada parte y, debajo de la raya, la suma.
+        <dl className={cx("mt-3 space-y-1 text-sm", t.text)}>
+          {rows.map((r, i) => (
+            <div key={r.label} className="flex justify-between gap-3">
+              <dt className="opacity-80">{i > 0 ? "+ " : ""}{r.label}</dt>
+              <dd className="tabular-nums">{r.value}</dd>
+            </div>
+          ))}
+          <div className={cx("flex items-baseline justify-between gap-3 border-t pt-2", t.border)}>
+            <dt className="font-medium">Total</dt>
+            <dd className="text-xl font-medium tabular-nums">{value}</dd>
+          </div>
+        </dl>
+      ) : (
+        <p className={cx("mt-3 text-xl font-medium", t.text)}>{value}</p>
+      )}
     </div>
   );
 }

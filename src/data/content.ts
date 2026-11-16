@@ -38,7 +38,7 @@ export type ModeOption = {
   perks?: string[];
 };
 
-export type Stat = { label: string; value: string; icon: IconName; tone: Tone };
+export type Stat = { label: string; value: string; icon: IconName; tone: Tone; rows?: { label: string; value: string }[] };
 
 export type Recommendation = {
   createdAt: string;
