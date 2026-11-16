@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { brand, themes, type ThemeName } from "./config/brand";
 import type { GoalId, Recommendation } from "./data/content";
 import { NETWORKS, destinationGroups, findTrip, freeNetwork, nearestPlace, networkById, placeGroups, type NetworkId, type Place } from "./data/networks";
-import { recommend, type UsualMode } from "./lib/engine";
+import { recommend, type UsualMode, type CarInfo } from "./lib/engine";
 import { bikeCoverage, getBikeData, type BikeCoverage } from "./lib/bikes";
 import { getAir, getBusEta, getStreetTimes, getWeather, type Air, type Weather } from "./lib/live";
 import { addRemote, clearRemote, deleteRemote, loadLocal, loadPending, loadRemote, storeLocal, storePending, type SavedTrip } from "./lib/savings";
@@ -54,6 +54,11 @@ export default function App() {
     try { const v = localStorage.getItem("yio.usual"); return v === "taxi" || v === "auto" || v === "walk" ? v : "bus"; } catch { return "bus"; }
   });
   useEffect(() => { try { localStorage.setItem("yio.usual", usual); } catch { /* noop */ } }, [usual]);
+  const [car, setCar] = useState<CarInfo>(() => {
+    try { const v = JSON.parse(localStorage.getItem("yio.car") ?? "null"); if (v && v.type) return v; } catch { /* noop */ }
+    return { type: "sedan", parking: 0 };
+  });
+  useEffect(() => { try { localStorage.setItem("yio.car", JSON.stringify(car)); } catch { /* noop */ } }, [car]);
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
   const [weather, setWeather] = useState<Weather | null>(null);
   const [bikeCov, setBikeCov] = useState<BikeCoverage | null>(null);
@@ -200,7 +205,7 @@ export default function App() {
       if (!origin || !dest) { setLoading(false); return; }
       const fnet = freeNetwork(origin, dest);
       const streets = await getStreetTimes(origin, dest);
-      r = recommend({ network: fnet, from: fnet.stops.A.place, to: fnet.stops.B.place, goal, now: new Date(), weather, air, busEta: null, streets, hasBike, hasScooter, usual });
+      r = recommend({ network: fnet, from: fnet.stops.A.place, to: fnet.stops.B.place, goal, now: new Date(), weather, air, busEta: null, streets, hasBike, hasScooter, usual, car });
     } else {
       const trip = findTrip(net, from, to);
       const [busEta, streets] = trip
@@ -209,7 +214,7 @@ export default function App() {
             getStreetTimes(net.stops[trip.stopIds[0]], net.stops[trip.stopIds[trip.stopIds.length - 1]]),
           ])
         : [null, null];
-      r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, streets, hasBike, hasScooter, usual });
+      r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, streets, hasBike, hasScooter, usual, car });
     }
     setResult(r);
     setBikeCov(null);
@@ -330,6 +335,8 @@ export default function App() {
           onHasScooter={setHasScooter}
           usual={usual}
           onUsual={(v) => { setUsual(v); setResult(null); }}
+          car={car}
+          onCar={(v) => { setCar(v); setResult(null); }}
           from={from}
           to={to}
           onFrom={(v) => changeFrom(v)}

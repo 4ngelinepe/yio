@@ -37,7 +37,21 @@ export type EngineInput = {
   hasScooter: boolean;
   /** Cómo iría la persona normalmente: el ahorro se mide contra esto, no contra el taxi. */
   usual?: UsualMode;
+  /** Solo si usual = "auto": tipo de auto y cuánto paga de parqueo. */
+  car?: CarInfo;
 };
+
+export type CarType = "compacto" | "sedan" | "camioneta";
+export type CarInfo = { type: CarType; parking: number };
+/** Rendimiento referencial en tráfico de Lima, km por galón. */
+export const CAR_KMPG: Record<CarType, number> = { compacto: 38, sedan: 28, camioneta: 20 };
+export const CAR_LABEL: Record<CarType, string> = { compacto: "Compacto", sedan: "Sedán o SUV", camioneta: "Camioneta" };
+/**
+ * Precio del galón de gasohol regular (90) en Lima, rango mínimo–máximo entre grifos.
+ * Fuente: Facilito (Osinergmin), reportado por Infobae el 5 ago 2026. Actualizar una vez al mes.
+ */
+export const FUEL_PRICE: [number, number] = [17.24, 21.49];
+export const FUEL_SOURCE = "Facilito de Osinergmin, ago 2026";
 
 export type UsualMode = "bus" | "taxi" | "auto" | "walk";
 export const USUAL_LABEL: Record<UsualMode, string> = { bus: "bus o combi", taxi: "taxi o app", auto: "auto propio", walk: "a pie" };
@@ -366,7 +380,10 @@ export function recommend(input: EngineInput): Recommendation | null {
   const active = recommended !== "bus";
   // Ahorro real: contra cómo iría la persona normalmente (por defecto, bus o combi), no contra el peor caso.
   const usual: UsualMode = input.usual ?? "bus";
-  const autoCost: Range = [roundHalf(taxiKm * 0.4), roundHalf(taxiKm * 0.6)];
+  const car: CarInfo = input.car ?? { type: "sedan", parking: 0 };
+  const kmpg = CAR_KMPG[car.type];
+  const fuel: Range = [(taxiKm * FUEL_PRICE[0]) / kmpg, (taxiKm * FUEL_PRICE[1]) / kmpg];
+  const autoCost: Range = [roundHalf(fuel[0] + car.parking), roundHalf(fuel[1] + car.parking)];
   const baseline: Range = usual === "taxi" ? taxi.cost : usual === "auto" ? autoCost : usual === "bus" ? USUAL_BUS : [0, 0];
   const recCost = active ? 0 : fare;
   const savings: Range = [Math.max(0, baseline[0] - recCost), Math.max(0, baseline[1] - recCost)];
@@ -375,7 +392,7 @@ export function recommend(input: EngineInput): Recommendation | null {
   const modeName = { walk: "a pie", bike: "en bici", scooter: "en scooter", bus: `en ${busName}` }[recommended];
   const baselineWords =
     usual === "taxi" ? `Normalmente irías en taxi o app: ${solesRange(taxi.cost)} por ${taxiKm.toFixed(1)} km.`
-    : usual === "auto" ? `Normalmente irías en tu auto: unos ${solesRange(autoCost)} de combustible por ${taxiKm.toFixed(1)} km (estimado, sin estacionamiento).`
+    : usual === "auto" ? `Normalmente irías en tu auto (${CAR_LABEL[car.type].toLowerCase()}, ~${kmpg} km por galón): ${solesRange([roundHalf(fuel[0]), roundHalf(fuel[1])])} de gasolina por ${taxiKm.toFixed(1)} km, con el galón entre ${soles(FUEL_PRICE[0])} y ${soles(FUEL_PRICE[1])} (${FUEL_SOURCE})${car.parking > 0 ? `, más ${soles(car.parking)} de parqueo` : ", sin parqueo"}. No contamos desgaste ni seguro.`
     : usual === "bus" ? `Normalmente irías en bus o combi: un pasaje de ${solesRange(USUAL_BUS)} (referencial).`
     : "Normalmente irías a pie: no gastas nada.";
   const savingsHow: string[] = [

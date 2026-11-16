@@ -8,7 +8,7 @@ import { cx } from "../lib/tones";
 import { aqiLabel, isPeak, PEAK_LABEL } from "../lib/engine";
 import { Icon } from "./ui/Icon";
 import { Farol, VentanaReja } from "./ui/LimaIcons";
-import { USUAL_LABEL, type UsualMode } from "../lib/engine";
+import { USUAL_LABEL, CAR_LABEL, CAR_KMPG, type UsualMode, type CarInfo, type CarType } from "../lib/engine";
 import { Button, Card } from "./ui/primitives";
 
 type Props = {
@@ -39,6 +39,8 @@ type Props = {
   onHasScooter: (v: boolean) => void;
   usual: UsualMode;
   onUsual: (v: UsualMode) => void;
+  car: CarInfo;
+  onCar: (v: CarInfo) => void;
   onCalculate: () => void;
   loading: boolean;
 };
@@ -400,6 +402,23 @@ export function DailyRecommendation(p: Props) {
         </select>
         <span className="text-xs text-muted">El ahorro se calcula contra esto.</span>
       </div>
+      {p.usual === "auto" && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-ink">
+          <label htmlFor="cartype" className="text-sm text-muted">Mi auto es:</label>
+          <select id="cartype" value={p.car.type} onChange={(e) => p.onCar({ ...p.car, type: e.target.value as CarType })}
+            className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
+            {(Object.keys(CAR_LABEL) as CarType[]).map((k) => <option key={k} value={k}>{CAR_LABEL[k]} · ~{CAR_KMPG[k]} km/gal</option>)}
+          </select>
+          <label htmlFor="parking" className="text-sm text-muted">Parqueo:</label>
+          <select id="parking" value={p.car.parking} onChange={(e) => p.onCar({ ...p.car, parking: Number(e.target.value) })}
+            className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
+            <option value={0}>No pago</option>
+            <option value={5}>S/ 5</option>
+            <option value={10}>S/ 10</option>
+            <option value={15}>S/ 15 o más</option>
+          </select>
+        </div>
+      )}
 
       <div className="mt-8">
         <Button
