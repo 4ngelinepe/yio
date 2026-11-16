@@ -46,3 +46,6 @@ alter table public.savings add column if not exists route text check (char_lengt
 
 -- Bitácora (nov 2026): distancia de cada viaje, en km. Idempotente.
 alter table public.savings add column if not exists km numeric check (km >= 0 and km <= 300);
+
+-- Bitácora (nov 2026): CO₂ que no emitiste en el viaje, en kg (ida y vuelta si aplica). Idempotente.
+alter table public.savings add column if not exists co2 numeric check (co2 >= 0 and co2 <= 200);

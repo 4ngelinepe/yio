@@ -257,6 +257,7 @@ export default function App() {
       mode: result.recommended,
       route: result.noBus ? undefined : result.options.find((o) => o.id === "bus")?.title,
       km: result.km,
+      co2: result.co2,
       amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
       kcal: rec.kcal * (result.roundTrip ? 2 : 1),
     };

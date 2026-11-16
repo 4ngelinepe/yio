@@ -71,6 +71,8 @@ export type Recommendation = {
   noBus?: boolean;
   /** Sin bus, sin bici y más de 75 min a pie: no hay una buena opción en YIO. */
   tooFar?: boolean;
+  /** CO₂ que no emitiste frente a lo de siempre, en kg (ya incluye ida y vuelta). */
+  co2?: number;
   /** Si el ahorro, los km y la energía cuentan ida y vuelta. */
   roundTrip?: boolean;
   /** Distancia del viaje recomendado, en km (por dos si es ida y vuelta). */

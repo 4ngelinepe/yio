@@ -104,9 +104,10 @@ export function MySavings(p: Props) {
       ) : (
         <>
           <p className="mt-1 text-sm text-muted">Este mes</p>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <StatTile label="Viajes" value={`${m.trips}${m.km ? ` · ${m.km.toLocaleString("es-PE")} km` : ""}`} icon="footprints" tone="info" />
             <StatTile label="Ahorrado" value={soles(m.amount)} icon="dollar" tone="success" />
+            <StatTile label="CO₂ que no emitiste" value={`${m.co2.toLocaleString("es-PE")} kg`} icon="wind" tone="info" />
             <StatTile label="Energía" value={`${m.kcal.toLocaleString("es-PE")} kcal`} icon="flame" tone="energy" />
             <StatTile label="Viajes en bici" value={`${m.bikeTrips % BIKE_TRIPS_PER_DAY_OFF} de ${BIKE_TRIPS_PER_DAY_OFF}`} icon="bike" tone="highlight" />
           </div>

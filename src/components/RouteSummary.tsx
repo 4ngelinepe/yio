@@ -32,7 +32,7 @@ export function RouteSummary({ data, save, onSave }: {
       <p className="mt-1 text-muted">{data.why}</p>
       <p className="mt-3 border-l-2 border-primary pl-3 text-sm italic text-ink">{data.quote}</p>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {data.today.map((s) => <StatTile key={s.label} {...s} />)}
       </div>
 

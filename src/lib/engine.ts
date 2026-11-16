@@ -55,6 +55,16 @@ export const CAR_LABEL: Record<CarType, string> = { compacto: "Compacto", sedan:
 export const FUEL_PRICE: [number, number] = [17.24, 21.49];
 export const FUEL_SOURCE = "Facilito de Osinergmin, ago 2026";
 
+/**
+ * CO₂ por galón de gasohol: 8.78 kg CO₂/gal de gasolina (EPA, GHG Emission Factors Hub 2024, valores IPCC)
+ * × 92.2 % fósil: el gasohol peruano lleva 7.8 % de etanol y el CO₂ de la biomasa no se cuenta en la huella
+ * (criterio de los informes que se reportan a Huella de Carbono Perú).
+ */
+export const CO2_KG_PER_GAL = 8.1;
+/** Bus diésel o a gas por pasajero-km. Referencia internacional (DEFRA/DESNZ 2026, bus local promedio): Lima no publica un factor oficial por pasajero. */
+export const CO2_BUS_KG_PER_PKM = 0.1;
+export const CO2_SOURCE = "gasolina: EPA 2024 (IPCC), ajustada al 7.8 % de etanol del gasohol; bus: DEFRA 2026";
+
 export type UsualMode = "bus" | "taxi" | "auto" | "walk";
 export const USUAL_LABEL: Record<UsualMode, string> = { bus: "bus o combi", taxi: "taxi o app", auto: "auto propio", walk: "a pie" };
 /** Pasaje referencial de bus o combi convencional en Lima. */
@@ -397,6 +407,17 @@ export function recommend(input: EngineInput): Recommendation | null {
   const legSav: Range = [roundHalf(Math.max(0, legBase[0] - legFare)), roundHalf(Math.max(0, legBase[1] - legFare))];
   const park = usual === "auto" ? car.parking : 0;
   const savings: Range = [legSav[0] * legs + park, legSav[1] * legs + park];
+  // CO₂ que no emitiste: lo que emitiría lo de siempre menos lo que emite el viaje de hoy, por tramo.
+  // Transporte eléctrico (Metro, Expreso San Isidro): se cuenta 0 en el tubo de escape; la electricidad no se suma.
+  const recNet = combo ? combo.c.net : net;
+  const recKm = viaCombo ? (rideDistanceM(combo!.c.net, combo!.c.trip) * 1.05) / 1000 : rideKm;
+  const co2Base = usual === "auto" ? (taxiKm / kmpg) * CO2_KG_PER_GAL
+    : usual === "taxi" ? (taxiKm / CAR_KMPG.sedan) * CO2_KG_PER_GAL
+    : usual === "bus" ? taxiKm * CO2_BUS_KG_PER_PKM : 0;
+  const co2Rec = active || recNet.electric ? 0 : recKm * CO2_BUS_KG_PER_PKM;
+  const co2Leg = Math.round(Math.max(0, co2Base - co2Rec) * 10) / 10;
+  const co2 = Math.round(co2Leg * legs * 10) / 10;
+  const kg = (n: number) => `${n.toLocaleString("es-PE", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
   const savingsRows = legs === 2 || park > 0
     ? [
         { label: legs === 2 ? "Ida" : "Viaje", value: solesRange(legSav) },
@@ -421,6 +442,7 @@ export function recommend(input: EngineInput): Recommendation | null {
         ? "Ya ibas a pie: hoy no hay ahorro en plata, pero sumas actividad."
         : `Hoy no ahorras plata${recCost > 0 ? `: pagas ${soles(recCost)} a cambio de llegar antes` : ""}.`,
     usual !== "taxi" ? `Como referencia, en taxi serían ${solesRange(taxiCost)}${tramo}.` : null,
+    usual === "walk" ? null : `CO₂: ${usual === "bus" ? `${CO2_BUS_KG_PER_PKM} kg por pasajero-km en bus` : `${CO2_KG_PER_GAL} kg por galón de gasohol`}${co2Rec > 0 ? `, menos lo que emite el bus de hoy` : recNet.electric && !active ? ` (${busName} es eléctrico: contamos 0 en el escape)` : ""}. Fuentes: ${CO2_SOURCE}.`,
   ].filter((x): x is string => !!x);
 
   const monthly: Range = [savings[0] * 20, savings[1] * 20];
@@ -442,6 +464,10 @@ export function recommend(input: EngineInput): Recommendation | null {
     today: [
       { label: { walk: "Duración caminando", bike: "Duración en bici", scooter: "Duración en scooter", bus: "Duración del viaje" }[recommended], value: minRange(rec.minutes), icon: "clock", tone: "info" },
       { label: "Ahorro hoy", value: solesRange(savings), icon: "dollar", tone: "success", rows: savingsRows },
+      {
+        label: "CO₂ que no emitiste", value: kg(co2), icon: "wind", tone: "info",
+        rows: legs === 2 && co2 > 0 ? [{ label: "Ida", value: kg(co2Leg) }, { label: "Vuelta", value: kg(co2Leg) }] : undefined,
+      },
       { label: "Congestión generada", value: rec.congestion, icon: "car", tone: "highlight" },
     ],
     impact: {
@@ -498,6 +524,7 @@ export function recommend(input: EngineInput): Recommendation | null {
     noBus: noBus && !viaCombo,
     tooFar: noBus && recommended === "walk" && wm > 75,
     roundTrip: legs === 2,
+    co2,
     km: legs * Math.round((viaCombo ? (combo!.c.walk1M + combo!.c.walk2M) / 1000 + (rideDistanceM(combo!.c.net, combo!.c.trip) * 1.05) / 1000 : active ? walkM / 1000 : rideKm) * 10) / 10,
     parking: viaCombo && combo!.c.parking
       ? { lat: combo!.c.parking.lat, lng: combo!.c.parking.lng, m: combo!.c.parking.m, label: `Deja tu bici aquí: ${PARKING_TYPE[combo!.c.parking.type]} a ${combo!.c.parking.m} m de ${combo!.c.board}` }

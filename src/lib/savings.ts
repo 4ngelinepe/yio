@@ -18,6 +18,7 @@ export type SavedTrip = {
   amount: number; // soles, punto medio del rango estimado
   kcal: number;
   km?: number; // distancia del viaje
+  co2?: number; // kg de CO₂ que no emitiste
 
   pending?: boolean; // guardado sin conexión, falta subirlo
 };
@@ -49,7 +50,7 @@ export const storePending = (list: SavedTrip[]) => write(PENDING_KEY, list);
 
 type Row = {
   id: string; trip_at: string; from_place: string; to_place: string; mode: ModeId;
-  route?: string | null; amount: number; kcal: number; km?: number | null;
+  route?: string | null; amount: number; kcal: number; km?: number | null; co2?: number | null;
 };
 
 const COLS = "id, trip_at, from_place, to_place, mode, amount, kcal";
@@ -57,25 +58,31 @@ const COLS = "id, trip_at, from_place, to_place, mode, amount, kcal";
 let hasRouteColumn = true;
 // La columna "km" (bitácora) se agregó en nov 2026; mismo respaldo.
 let hasKmColumn = true;
-const cols = () => `${COLS}${hasRouteColumn ? ", route" : ""}${hasKmColumn ? ", km" : ""}`;
+// La columna "co2" (kg evitados) se agregó en nov 2026; mismo respaldo.
+let hasCo2Column = true;
+const cols = () => `${COLS}${hasRouteColumn ? ", route" : ""}${hasKmColumn ? ", km" : ""}${hasCo2Column ? ", co2" : ""}`;
 const missingRoute = (e: { message?: string } | null) => !!e?.message && /route/i.test(e.message);
+const missingCo2 = (e: { message?: string } | null) => !!e?.message && /co2/i.test(e.message);
 const missingKm = (e: { message?: string } | null) => !!e?.message && /\bkm\b/i.test(e.message);
 
 const toRow = (t: SavedTrip) => ({
   trip_at: t.date, from_place: t.from, to_place: t.to, mode: t.mode, amount: t.amount, kcal: t.kcal,
   ...(hasRouteColumn && t.route ? { route: t.route } : {}),
   ...(hasKmColumn && t.km != null ? { km: t.km } : {}),
+  ...(hasCo2Column && t.co2 != null ? { co2: t.co2 } : {}),
 });
 const fromRow = (r: Row): SavedTrip => ({
   id: r.id, date: r.trip_at, from: r.from_place, to: r.to_place, mode: r.mode,
   route: r.route ?? undefined, amount: Number(r.amount), kcal: r.kcal,
   km: r.km != null ? Number(r.km) : undefined,
+  co2: r.co2 != null ? Number(r.co2) : undefined,
 });
 
 export async function loadRemote(): Promise<SavedTrip[]> {
   let res = await supabase.from("savings").select(cols()).order("trip_at", { ascending: false }).limit(500);
-  for (let i = 0; i < 2 && res.error; i++) {
-    if (hasKmColumn && missingKm(res.error)) hasKmColumn = false;
+  for (let i = 0; i < 3 && res.error; i++) {
+    if (hasCo2Column && missingCo2(res.error)) hasCo2Column = false;
+    else if (hasKmColumn && missingKm(res.error)) hasKmColumn = false;
     else if (hasRouteColumn && missingRoute(res.error)) hasRouteColumn = false;
     else break;
     res = await supabase.from("savings").select(cols()).order("trip_at", { ascending: false }).limit(500);
@@ -87,8 +94,9 @@ export async function loadRemote(): Promise<SavedTrip[]> {
 export async function addRemote(trips: SavedTrip[]): Promise<SavedTrip[]> {
   if (!trips.length) return [];
   let res = await supabase.from("savings").insert(trips.map(toRow)).select(cols());
-  for (let i = 0; i < 2 && res.error; i++) {
-    if (hasKmColumn && missingKm(res.error)) hasKmColumn = false;
+  for (let i = 0; i < 3 && res.error; i++) {
+    if (hasCo2Column && missingCo2(res.error)) hasCo2Column = false;
+    else if (hasKmColumn && missingKm(res.error)) hasKmColumn = false;
     else if (hasRouteColumn && missingRoute(res.error)) hasRouteColumn = false;
     else break;
     res = await supabase.from("savings").insert(trips.map(toRow)).select(cols());
@@ -127,6 +135,7 @@ export function monthSummary(list: SavedTrip[], now = new Date()) {
     kcal: month.reduce((s, t) => s + t.kcal, 0),
     active: month.filter((t) => t.mode !== "bus").length,
     km: Math.round(month.reduce((s, t) => s + (t.km ?? 0), 0) * 10) / 10,
+    co2: Math.round(month.reduce((s, t) => s + (t.co2 ?? 0), 0) * 10) / 10,
     bikeTrips: list.filter(isBikeTrip).length,
   };
 }
