@@ -290,8 +290,9 @@ export function recommend(input: EngineInput): Recommendation | null {
     const d = Math.round(mid(walk.minutes) - mid(o.minutes));
     return d >= 2 ? `${d} min menos que caminando` : null;
   };
-  walk.perks = [vsBus, vsTaxi, `Quemas ≈ ${walk.kcal} kcal`].filter(Boolean) as string[];
-  bike.perks = [vsBus, vsTaxi, fasterThanWalk(bike), `Quemas ≈ ${bike.kcal} kcal`].filter(Boolean) as string[];
+  const kcalTxt = (k: number) => input.roundTrip ? `Quemas ≈ ${k * 2} kcal ida y vuelta` : `Quemas ≈ ${k} kcal`;
+  walk.perks = [vsBus, vsTaxi, kcalTxt(walk.kcal)].filter(Boolean) as string[];
+  bike.perks = [vsBus, vsTaxi, fasterThanWalk(bike), kcalTxt(bike.kcal)].filter(Boolean) as string[];
   scooter.perks = [vsBus, vsTaxi, fasterThanWalk(scooter), "No quema calorías: es eléctrico"].filter(Boolean) as string[];
   // Por corredor con bici: ¿hay dónde dejarla junto al paradero de subida?
   const boardParking = !noBus && input.hasBike ? nearestParking(first, 300) : null;
@@ -468,7 +469,10 @@ export function recommend(input: EngineInput): Recommendation | null {
         label: "CO₂ que no emitiste", value: kg(co2), icon: "wind", tone: "info",
         rows: legs === 2 && co2 > 0 ? [{ label: "Ida", value: kg(co2Leg) }, { label: "Vuelta", value: kg(co2Leg) }] : undefined,
       },
-      { label: "Congestión generada", value: rec.congestion, icon: "car", tone: "highlight" },
+      {
+        label: "Energía de hoy", value: `≈ ${(rec.kcal * legs).toLocaleString("es-PE")} kcal`, icon: "flame", tone: "energy",
+        rows: legs === 2 && rec.kcal > 0 ? [{ label: "Ida", value: `${rec.kcal} kcal` }, { label: "Vuelta", value: `${rec.kcal} kcal` }] : undefined,
+      },
     ],
     impact: {
       intro: "Si repites esta decisión 20 días/mes:",

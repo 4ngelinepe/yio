@@ -1,4 +1,4 @@
-import { BalconCajon } from "./ui/LimaIcons";
+import { Huaca } from "./ui/LimaIcons";
 import { useState } from "react";
 import { ArrowLeftRight, ArrowRight, CloudOff, Loader2, Trash2, Wallet, X } from "lucide-react";
 import { soles } from "../lib/engine";
@@ -96,7 +96,7 @@ export function MySavings(p: Props) {
 
       {p.list.length === 0 ? (
         <div className="mt-6 flex flex-col items-center gap-3 rounded-tile border border-dashed border-line px-6 py-10 text-center">
-          <BalconCajon className="size-12 text-primary" />
+          <Huaca className="size-12 text-primary" />
           <p className="max-w-sm text-muted">
             Todavía no registras viajes. Calcula un tramo y toca <strong>Registrar este viaje</strong>: aquí verás tus kilómetros, lo que ahorras y tus viajes en bici.
           </p>

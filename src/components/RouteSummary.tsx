@@ -1,4 +1,4 @@
-import { PortadaArco } from "./ui/LimaIcons";
+import { PortadaArco, Cactus } from "./ui/LimaIcons";
 import { ArrowRight, Bookmark, BookmarkCheck, Loader2, Map } from "lucide-react";
 import type { Recommendation } from "../data/content";
 import { Button, Card, StatTile } from "./ui/primitives";
@@ -29,7 +29,14 @@ export function RouteSummary({ data, save, onSave }: {
         {route.from} <ArrowRight className="size-4" /> {route.to}
       </h2>
       <p className="mt-4 text-2xl font-medium text-ink">Recomendación: {headline(data)}</p>
-      <p className="mt-1 text-muted">{data.why}</p>
+      {data.tooFar ? (
+        <p className="mt-2 flex items-start gap-3 text-muted">
+          <Cactus className="size-8 shrink-0 text-energy" />
+          <span>{data.why}</span>
+        </p>
+      ) : (
+        <p className="mt-1 text-muted">{data.why}</p>
+      )}
       <p className="mt-3 border-l-2 border-primary pl-3 text-sm italic text-ink">{data.quote}</p>
 
       <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
