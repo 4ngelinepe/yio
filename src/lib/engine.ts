@@ -173,7 +173,12 @@ export function recommend(input: EngineInput): Recommendation | null {
   const walkAllMin = mid(walk.minutes);
   // Con bici (y sin lluvia) también se evalúa "bici hasta un paradero con biciestacionamiento + bus o Metro".
   const canBike = input.hasBike && !input.weather?.rainy && !input.weather?.rainSoon;
-  const combo = !noBus ? null : findCombos(first, last, 1200, canBike)
+  // Si a 1.2 km no hay paradero y el tramo es largo, se busca hasta 2 km: mejor caminar 25 min que 3 horas.
+  const pickCombos = () => {
+    const near = findCombos(first, last, 1200, canBike);
+    return walkAllMin > 60 && !near.some((c) => c.first === "walk") ? [...near, ...findCombos(first, last, 2000, false)] : near;
+  };
+  const combo = !noBus ? null : pickCombos()
     .filter((c) => !closedNet(c.net))
     .map((c: Combo) => {
       const ride = ((rideDistanceM(c.net, c.trip) * 1.05) / 1000 / (peak ? c.net.speedKmh[0] : c.net.speedKmh[1])) * 60;
@@ -297,7 +302,8 @@ export function recommend(input: EngineInput): Recommendation | null {
         : `Caminas ${round(combo!.walkMin)} min y ${busName} hace el resto.`
       : status.level === 3 ? "Ojo: la calidad del aire no está buena ahora. Si puedes, espera o toma un bus."
       : recommended === "walk"
-        ? wm > 60 ? "Es un tramo largo a pie. Si tienes bici o scooter, márcalo arriba."
+        ? wm > 75 ? `A pie son unas ${Math.round(wm / 60)} horas: no te lo recomendamos. YIO todavía no tiene transporte para este tramo; toma un bus o combi, o marca bici arriba.`
+        : wm > 60 ? "Es un tramo largo a pie. Si tienes bici o scooter, márcalo arriba."
         : input.goal === "rapido" && wheels.length ? "Para este tramo, caminando llegas igual de rápido."
         : input.goal === "bienestar" ? "Caminando sumas minutos de actividad y el aire lo permite."
         : "Es un tramo caminable: no gastas nada."
@@ -456,6 +462,7 @@ export function recommend(input: EngineInput): Recommendation | null {
       : trip.stopIds.map((id) => ({ lat: stops[id].lat, lng: stops[id].lng, name: stops[id].place })),
     live: !!eta && eta.source === "live",
     noBus: noBus && !viaCombo,
+    tooFar: noBus && recommended === "walk" && wm > 75,
     km: Math.round((viaCombo ? (combo!.c.walk1M + combo!.c.walk2M) / 1000 + (rideDistanceM(combo!.c.net, combo!.c.trip) * 1.05) / 1000 : active ? walkM / 1000 : rideKm) * 10) / 10,
     parking: viaCombo && combo!.c.parking
       ? { lat: combo!.c.parking.lat, lng: combo!.c.parking.lng, m: combo!.c.parking.m, label: `Deja tu bici aquí: ${PARKING_TYPE[combo!.c.parking.type]} a ${combo!.c.parking.m} m de ${combo!.c.board}` }

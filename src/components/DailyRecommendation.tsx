@@ -143,7 +143,7 @@ function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
   if (value) {
     const slot = slotOf(saved, value);
     return (
-      <div>
+      <div className="min-w-0">
         <p className="mb-1.5 text-sm text-muted">{label}</p>
         <div className="flex items-center gap-3 rounded-tile border-2 border-primary bg-primary-soft px-4 py-3 text-lg text-primary-text">
           {slot === "casa" ? <Home className="size-5 shrink-0" aria-hidden /> : slot === "trabajo" ? <Briefcase className="size-5 shrink-0" aria-hidden /> : <MapPin className="size-5 shrink-0" aria-hidden />}
@@ -174,7 +174,7 @@ function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
   ];
 
   return (
-    <div>
+    <div className="min-w-0">
       <label htmlFor={id} className="mb-1.5 block text-sm text-muted">{label}</label>
       <form onSubmit={search} className="flex gap-2" role="search">
         <input id={id} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Calle, lugar o distrito" autoComplete="off"

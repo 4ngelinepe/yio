@@ -7,10 +7,12 @@ export type SaveState = { kind: "idle" } | { kind: "saving" } | { kind: "saved";
 
 const headline = (r: Recommendation) => {
   const rec = r.options.find((o) => o.id === r.recommended)!;
+  if (r.tooFar) return "muy largo a pie";
   if (rec.id === "walk") return "camina";
   if (rec.id === "bike") return "ve en bici";
   if (rec.id === "scooter") return "ve en scooter";
   if (rec.title.startsWith("A pie + ")) return `camina y toma el ${rec.title.slice(8)}`;
+  if (rec.title.startsWith("Bici + ")) return `pedalea y toma el ${rec.title.slice(7)}`;
   return `toma el ${rec.title}`;
 };
 
