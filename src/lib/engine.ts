@@ -20,6 +20,7 @@ import { ROJO, distanceM, findCombos, findTrip, rideDistanceM, type Combo, type 
 /** Pasaje de referencia para las equivalencias ("N pasajes de bus"). */
 const REF_FARE = ROJO.fare;
 import type { Air, BusEta, StreetTimes, Weather } from "./live";
+import { PARKING_TYPE, nearestParking } from "./parking";
 
 export type EngineInput = {
   network: Network;
@@ -170,17 +171,22 @@ export function recommend(input: EngineInput): Recommendation | null {
   // Combinado (solo sin bus): a pie hasta un paradero, bus o Metro, a pie al destino.
   // Solo cuenta si de verdad te ahorra caminata y tiempo frente a caminar todo.
   const walkAllMin = mid(walk.minutes);
-  const combo = !noBus ? null : findCombos(first, last)
+  // Con bici (y sin lluvia) también se evalúa "bici hasta un paradero con biciestacionamiento + bus o Metro".
+  const canBike = input.hasBike && !input.weather?.rainy && !input.weather?.rainSoon;
+  const combo = !noBus ? null : findCombos(first, last, 1200, canBike)
     .filter((c) => !closedNet(c.net))
     .map((c: Combo) => {
       const ride = ((rideDistanceM(c.net, c.trip) * 1.05) / 1000 / (peak ? c.net.speedKmh[0] : c.net.speedKmh[1])) * 60;
       const w = peak ? c.net.wait.peak : c.net.wait.off;
-      const walkMin = (c.walk1M + c.walk2M) / 80;
+      const lead = c.first === "bike" ? (c.walk1M / 1000 / 14) * 60 + 3 : c.walk1M / 80; // +3 min para estacionar
+      const walkMin = (c.first === "bike" ? 0 : c.walk1M / 80) + c.walk2M / 80;
       const extra = c.net.kind === "rail" ? 3 : 0; // entrar y salir de la estación
-      const minutes: Range = [round(walkMin + ride * 0.9 + w[0] + extra), round(walkMin * 1.1 + ride * 1.2 + w[1] + extra + 3)];
-      return { c, ride, walkMin, minutes };
+      const minutes: Range = [round(lead + c.walk2M / 80 + ride * 0.9 + w[0] + extra), round((lead + c.walk2M / 80) * 1.1 + ride * 1.2 + w[1] + extra + 3)];
+      return { c, ride, lead, walkMin, minutes };
     })
-    .filter((x) => x.walkMin <= walkAllMin * 0.6 && mid(x.minutes) < walkAllMin)
+    .filter((x) => x.c.first === "bike"
+      ? mid(x.minutes) < mid(bike.minutes) - 3
+      : x.walkMin <= walkAllMin * 0.6 && mid(x.minutes) < walkAllMin)
     .sort((a, b) => mid(a.minutes) - mid(b.minutes))[0] ?? null;
 
   // Bus de la red elegida
@@ -215,16 +221,19 @@ export function recommend(input: EngineInput): Recommendation | null {
   if (combo) {
     const c = combo.c;
     const rail = c.net.kind === "rail";
+    const byBike = c.first === "bike";
     Object.assign(bus, {
-      title: `A pie + ${c.net.name}`,
+      title: `${byBike ? "Bici" : "A pie"} + ${c.net.name}`,
       subtitle: `Subes en ${c.board} · bajas en ${c.alight}`,
       icon: rail ? "train" : "bus",
       minutes: combo.minutes,
       cost: [c.net.fare, c.net.fare],
-      kcal: Math.round(((c.walk1M + c.walk2M) / 1000) * 55),
+      kcal: Math.round(((byBike ? c.walk2M : c.walk1M + c.walk2M) / 1000) * 55 + (byBike ? (c.walk1M / 1000) * 28 : 0)),
       congestion: rail ? "Cero" : c.net.electric ? "Baja" : peak ? "Media" : "Baja",
       note: [
-        `Caminas ${round(c.walk1M / 80)} min hasta ${c.board}, vas ${round(combo.ride)} min en ${c.net.busName} (${c.trip.stopIds.length - 1} ${rail ? "estaciones" : "paraderos"}) y caminas ${round(c.walk2M / 80)} min hasta tu destino.`,
+        `${byBike
+          ? `Pedaleas ${round(combo.lead - 3)} min hasta ${c.board} y dejas la bici en un ${PARKING_TYPE[c.parking!.type]} a ${c.parking!.m} m del paradero (datos de 2023: confírmalo la primera vez)`
+          : `Caminas ${round(c.walk1M / 80)} min hasta ${c.board}`}, vas ${round(combo.ride)} min en ${c.net.busName} (${c.trip.stopIds.length - 1} ${rail ? "estaciones" : "paraderos"}) y caminas ${round(c.walk2M / 80)} min hasta tu destino.`,
         "El tiempo incluye la espera.",
         c.net.rule,
       ].filter(Boolean).join(" "),
@@ -253,7 +262,9 @@ export function recommend(input: EngineInput): Recommendation | null {
   walk.perks = [vsBus, vsTaxi, `Quemas ≈ ${walk.kcal} kcal`].filter(Boolean) as string[];
   bike.perks = [vsBus, vsTaxi, fasterThanWalk(bike), `Quemas ≈ ${bike.kcal} kcal`].filter(Boolean) as string[];
   scooter.perks = [vsBus, vsTaxi, fasterThanWalk(scooter), "No quema calorías: es eléctrico"].filter(Boolean) as string[];
-  bus.perks = [`${solesRange([Math.max(0, taxi.cost[0] - fare), Math.max(0, taxi.cost[1] - fare)])} menos que un taxi`, peak && net.kind === "bus" ? "Hora punta: más tráfico y buses llenos" : null].filter(Boolean) as string[];
+  // Por corredor con bici: ¿hay dónde dejarla junto al paradero de subida?
+  const boardParking = !noBus && input.hasBike ? nearestParking(first, 300) : null;
+  bus.perks = [`${solesRange([Math.max(0, taxi.cost[0] - fare), Math.max(0, taxi.cost[1] - fare)])} menos que un taxi`, peak && net.kind === "bus" ? "Hora punta: más tráfico y buses llenos" : null, boardParking && !combo ? `Biciestacionamiento a ${boardParking.m} m de ${first.place}` : null].filter(Boolean) as string[];
 
   // Decisión
   const status = airStatus(input.air, input.weather);
@@ -445,5 +456,11 @@ export function recommend(input: EngineInput): Recommendation | null {
       : trip.stopIds.map((id) => ({ lat: stops[id].lat, lng: stops[id].lng, name: stops[id].place })),
     live: !!eta && eta.source === "live",
     noBus: noBus && !viaCombo,
+    km: Math.round((viaCombo ? (combo!.c.walk1M + combo!.c.walk2M) / 1000 + (rideDistanceM(combo!.c.net, combo!.c.trip) * 1.05) / 1000 : active ? walkM / 1000 : rideKm) * 10) / 10,
+    parking: viaCombo && combo!.c.parking
+      ? { lat: combo!.c.parking.lat, lng: combo!.c.parking.lng, m: combo!.c.parking.m, label: `Deja tu bici aquí: ${PARKING_TYPE[combo!.c.parking.type]} a ${combo!.c.parking.m} m de ${combo!.c.board}` }
+      : boardParking && recommended === "bus"
+        ? { lat: boardParking.lat, lng: boardParking.lng, m: boardParking.m, label: `${PARKING_TYPE[boardParking.type].replace(/^b/, "B")} a ${boardParking.m} m de ${first.place}` }
+        : undefined,
   };
 }

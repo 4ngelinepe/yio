@@ -13,8 +13,8 @@ const cssVar = (name: string) =>
 
 type BikeState = "off" | "loading" | "on" | "error";
 
-export function MapSection({ route, path, theme, autoBikes = false, bikePath, bikeCov, noBus = false }: {
-  route: Recommendation["route"]; path: Recommendation["path"]; theme: string; noBus?: boolean;
+export function MapSection({ route, path, theme, autoBikes = false, bikePath, bikeCov, noBus = false, parking }: {
+  route: Recommendation["route"]; path: Recommendation["path"]; theme: string; noBus?: boolean; parking?: Recommendation["parking"];
   bikePath?: [number, number][]; bikeCov?: BikeCoverage | null;
   /** Muestra las ciclovías de entrada (cuando el usuario tiene bici/scooter o se recomienda). */
   autoBikes?: boolean;
@@ -47,6 +47,14 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
     const end = (p: (typeof path)[number], color: string) =>
       L.circleMarker([p.lat, p.lng], { radius: 9, color: "#fff", weight: 3, fillColor: color, fillOpacity: 1 })
         .bindTooltip(p.name, { permanent: true, direction: "top", offset: [0, -8] }).addTo(map);
+    if (parking) {
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="width:22px;height:22px;border-radius:6px;background:${cssVar("--highlight")};color:#fff;font:700 13px/22px sans-serif;text-align:center;border:2px solid #fff">P</div>`,
+        iconSize: [22, 22], iconAnchor: [11, 11],
+      });
+      L.marker([parking.lat, parking.lng], { icon }).bindTooltip(parking.label).addTo(map);
+    }
     end(path[0], cssVar("--success"));
     end(path[path.length - 1], cssVar("--danger"));
 
@@ -56,7 +64,7 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
     map.fitBounds(L.latLngBounds(showBike ? [...pts, ...bikePath!] : pts), { padding: [40, 40] });
     setBikes("off");
     return () => { map.remove(); mapRef.current = null; bikeLayer.current = null; };
-  }, [path, theme, bikePath, autoBikes, noBus]);
+  }, [path, theme, bikePath, autoBikes, noBus, parking]);
 
   const routeMode = autoBikes && !!bikePath && bikePath.length > 1;
 
@@ -143,6 +151,7 @@ export function MapSection({ route, path, theme, autoBikes = false, bikePath, bi
         <li className="flex items-center gap-2"><span className={noBus ? "w-5 border-t-4 border-dotted border-primary" : "h-1 w-5 rounded-full bg-primary"} />{noBus ? "Tu ruta a pie" : `Recorrido del ${route.routeLabel.includes("Metro") ? "Metro" : "bus"}`}</li>
         {routeMode && <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-success" />Tu ruta en bici</li>}
         {bikes === "on" && <li className="flex items-center gap-2"><span className="h-1 w-5 rounded-full bg-highlight" />{routeMode && scope === "route" ? "Ciclovía en tu ruta" : "Ciclovías de la zona"}</li>}
+        {parking && <li className="flex items-center gap-2"><span className="grid size-4 place-items-center rounded bg-highlight text-[10px] font-bold text-white">P</span>Deja tu bici aquí</li>}
         {bikes === "on" && bikeCount.parking > 0 && <li className="flex items-center gap-2"><span className="size-2 rounded-full border-2 border-highlight" />Cicloparqueadero</li>}
       </ul>
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-6 py-4 text-sm text-ink sm:px-10 sm:text-base">

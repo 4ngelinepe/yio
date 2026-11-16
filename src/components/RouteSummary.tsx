@@ -53,21 +53,21 @@ export function RouteSummary({ data, save, onSave }: {
         <Button
           variant="success"
           aria-pressed={saved}
-          disabled={saved || save.kind === "saving" || data.savings[1] === 0}
+          disabled={saved || save.kind === "saving"}
           onClick={onSave}
           icon={
             save.kind === "saving" ? <Loader2 className="size-5 animate-spin" />
             : saved ? <BookmarkCheck className="size-5" /> : <Bookmark className="size-5" />
           }
         >
-          {save.kind === "saving" ? "Guardando…" : saved ? "Ahorro guardado" : "Guardar mi ahorro"}
+          {save.kind === "saving" ? "Registrando…" : saved ? "Viaje registrado" : "Registrar este viaje"}
         </Button>
         <p aria-live="polite" className="text-sm">
           {saved && (
             <span className="inline-flex items-center gap-2 text-success-text">
               <PortadaArco className="size-5 shrink-0" />
               Listo, {save.cloud ? "quedó en tu cuenta" : "quedó en este dispositivo"}.{" "}
-              <a href="#mis-ahorros" className="underline">Ver Mis ahorros</a>
+              <a href="#mis-ahorros" className="underline">Ver mi bitácora</a>
             </span>
           )}
           {save.kind === "error" && <span role="alert" className="text-danger-text">{save.msg}</span>}

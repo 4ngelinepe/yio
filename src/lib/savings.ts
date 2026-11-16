@@ -17,6 +17,8 @@ export type SavedTrip = {
   route?: string; // ej. "Corredor Rojo 201"
   amount: number; // soles, punto medio del rango estimado
   kcal: number;
+  km?: number; // distancia del viaje
+
   pending?: boolean; // guardado sin conexión, falta subirlo
 };
 
@@ -47,29 +49,36 @@ export const storePending = (list: SavedTrip[]) => write(PENDING_KEY, list);
 
 type Row = {
   id: string; trip_at: string; from_place: string; to_place: string; mode: ModeId;
-  route?: string | null; amount: number; kcal: number;
+  route?: string | null; amount: number; kcal: number; km?: number | null;
 };
 
 const COLS = "id, trip_at, from_place, to_place, mode, amount, kcal";
 // La columna "route" se agregó después; si la base aún no la tiene, se trabaja sin ella.
 let hasRouteColumn = true;
-const cols = () => (hasRouteColumn ? `${COLS}, route` : COLS);
+// La columna "km" (bitácora) se agregó en nov 2026; mismo respaldo.
+let hasKmColumn = true;
+const cols = () => `${COLS}${hasRouteColumn ? ", route" : ""}${hasKmColumn ? ", km" : ""}`;
 const missingRoute = (e: { message?: string } | null) => !!e?.message && /route/i.test(e.message);
+const missingKm = (e: { message?: string } | null) => !!e?.message && /\bkm\b/i.test(e.message);
 
 const toRow = (t: SavedTrip) => ({
   trip_at: t.date, from_place: t.from, to_place: t.to, mode: t.mode, amount: t.amount, kcal: t.kcal,
   ...(hasRouteColumn && t.route ? { route: t.route } : {}),
+  ...(hasKmColumn && t.km != null ? { km: t.km } : {}),
 });
 const fromRow = (r: Row): SavedTrip => ({
   id: r.id, date: r.trip_at, from: r.from_place, to: r.to_place, mode: r.mode,
   route: r.route ?? undefined, amount: Number(r.amount), kcal: r.kcal,
+  km: r.km != null ? Number(r.km) : undefined,
 });
 
 export async function loadRemote(): Promise<SavedTrip[]> {
-  let res = await supabase.from("savings").select(cols()).order("trip_at", { ascending: false }).limit(200);
-  if (res.error && hasRouteColumn && missingRoute(res.error)) {
-    hasRouteColumn = false;
-    res = await supabase.from("savings").select(cols()).order("trip_at", { ascending: false }).limit(200);
+  let res = await supabase.from("savings").select(cols()).order("trip_at", { ascending: false }).limit(500);
+  for (let i = 0; i < 2 && res.error; i++) {
+    if (hasKmColumn && missingKm(res.error)) hasKmColumn = false;
+    else if (hasRouteColumn && missingRoute(res.error)) hasRouteColumn = false;
+    else break;
+    res = await supabase.from("savings").select(cols()).order("trip_at", { ascending: false }).limit(500);
   }
   if (res.error) throw res.error;
   return (res.data as unknown as Row[]).map(fromRow);
@@ -78,8 +87,10 @@ export async function loadRemote(): Promise<SavedTrip[]> {
 export async function addRemote(trips: SavedTrip[]): Promise<SavedTrip[]> {
   if (!trips.length) return [];
   let res = await supabase.from("savings").insert(trips.map(toRow)).select(cols());
-  if (res.error && hasRouteColumn && missingRoute(res.error)) {
-    hasRouteColumn = false;
+  for (let i = 0; i < 2 && res.error; i++) {
+    if (hasKmColumn && missingKm(res.error)) hasKmColumn = false;
+    else if (hasRouteColumn && missingRoute(res.error)) hasRouteColumn = false;
+    else break;
     res = await supabase.from("savings").insert(trips.map(toRow)).select(cols());
   }
   if (res.error) throw res.error;
@@ -100,6 +111,11 @@ export async function clearRemote(): Promise<void> {
 export const modeLabel = (m: ModeId) =>
   ({ walk: "caminando", bike: "en bici", scooter: "en scooter", bus: "en bus", taxi: "en taxi" })[m];
 
+/** ¿Hubo bici en el viaje? (en bici, o bici hasta el paradero + bus o Metro) */
+export const isBikeTrip = (t: SavedTrip) => t.mode === "bike" || /^Bici \+/.test(t.route ?? "");
+/** Ley 30936: un día libre por cada 60 viajes en bici certificados (sector público). */
+export const BIKE_TRIPS_PER_DAY_OFF = 60;
+
 export function monthSummary(list: SavedTrip[], now = new Date()) {
   const month = list.filter((t) => {
     const d = new Date(t.date);
@@ -110,5 +126,7 @@ export function monthSummary(list: SavedTrip[], now = new Date()) {
     amount: month.reduce((s, t) => s + t.amount, 0),
     kcal: month.reduce((s, t) => s + t.kcal, 0),
     active: month.filter((t) => t.mode !== "bus").length,
+    km: Math.round(month.reduce((s, t) => s + (t.km ?? 0), 0) * 10) / 10,
+    bikeTrips: list.filter(isBikeTrip).length,
   };
 }

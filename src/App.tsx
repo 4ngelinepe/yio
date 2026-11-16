@@ -248,7 +248,8 @@ export default function App() {
       from: result.route.from,
       to: result.route.to,
       mode: result.recommended,
-      route: result.noBus ? "A pie o en bici" : result.options.find((o) => o.id === "bus")?.title,
+      route: result.noBus ? undefined : result.options.find((o) => o.id === "bus")?.title,
+      km: result.km,
       amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
       kcal: rec.kcal,
     };
@@ -343,7 +344,7 @@ export default function App() {
           <div ref={resultsRef} className="scroll-mt-24 space-y-10">
             <CorridorStatus data={result} />
             <RouteSummary data={result} save={saveState} onSave={save} />
-            <MapSection route={result.route} path={result.path} theme={theme} bikePath={result.bikePath} bikeCov={bikeCov} noBus={result.noBus}
+            <MapSection route={result.route} path={result.path} theme={theme} bikePath={result.bikePath} bikeCov={bikeCov} noBus={result.noBus} parking={result.parking}
               autoBikes={hasBike || hasScooter || result.recommended === "bike" || result.recommended === "scooter"} />
             <DirectComparison data={result} bikeCov={bikeCov} />
             <CumulativeImpact data={result.impact} />

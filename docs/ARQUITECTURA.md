@@ -139,6 +139,7 @@ Una sola tabla, `public.savings`: los ahorros que cada usuario guarda. Esquema c
 | `route` | text (≤ 40) | Red o "A pie o en bici" |
 | `amount` | numeric | S/ ahorrados (0–500) |
 | `kcal` | integer | 0–5000 |
+| `km` | numeric | Distancia del viaje (bitácora), 0–300 |
 
 **Seguridad (RLS):** cada usuario solo ve, crea y borra sus filas. No hay política de edición a propósito: un ahorro guardado no se modifica. Sin sesión, los ahorros se guardan en el dispositivo; sin señal, quedan en cola y se suben al volver la conexión.
 
@@ -166,6 +167,7 @@ Una sola tabla, `public.savings`: los ahorros que cada usuario guarda. Esquema c
 | Tiempos y rutas a pie y en bici | OpenRouteService (HeiGIT) | Puente `street-times`, clave en secreto | Plan gratuito: 2000 consultas/día | OK |
 | Clima, UV y calidad del aire | Open-Meteo | Directo desde el navegador | Gratis para uso no comercial | Revisar licencia para la Fase 2 |
 | Ciclovías y cicloparqueaderos | Pedalea Seguro 2.0 (ArcGIS, datos Banco Mundial 2023) | Directo desde el navegador | Público | OK |
+| Biciestacionamientos | Pedalea Seguro 2.0 (capa Cicloparqueaderos_Agrupado, 2023) | Archivo en el repo (`src/data/bikeparking.json`) | Público; sin capacidad ni horario | OK, revisar vigencia |
 | Buscador de lugares y autocompletar | HeiGIT Pelias | Puente `places`, misma clave ORS_KEY | Plan gratuito: 1000 búsquedas y 1000 autocompletados al día | OK |
 | Buscador de respaldo | Nominatim (OpenStreetMap) | Directo desde el navegador, solo si `places` falla | 1 consulta por segundo, sin autocompletar | Solo respaldo |
 | Mapa base | Teselas de OpenStreetMap | Directo desde el navegador | Uso moderado, con atribución | Reemplazar antes de crecer |

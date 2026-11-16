@@ -69,6 +69,10 @@ export type Recommendation = {
   live: boolean;
   /** Tramo sin bus: el recorrido del mapa es la ruta a pie. */
   noBus?: boolean;
+  /** Distancia del viaje recomendado, en km. */
+  km?: number;
+  /** Biciestacionamiento sugerido (bici + bus o Metro, o junto al paradero de subida). */
+  parking?: { lat: number; lng: number; m: number; label: string };
 };
 
 export const quotes: Record<GoalId, string[]> = {

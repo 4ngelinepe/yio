@@ -11,6 +11,7 @@
  *
  * Azul y Morado: sin coordenadas públicas todavía (ver bus-routes.ts y portal ATU).
  */
+import { nearestParking, type Parking } from "../lib/parking";
 import rojoRaw from "./rojo.json";
 import esiRaw from "./esi.json";
 import metroRaw from "./metro.json";
@@ -341,36 +342,51 @@ export function freeNetwork(a: Place, b: Place): Network {
 }
 
 /* ───────── Combinado: a pie hasta un paradero, bus/Metro, a pie al destino ───────── */
-export type Combo = { net: Network; trip: Trip; walk1M: number; walk2M: number; board: string; alight: string };
+export type Combo = {
+  net: Network; trip: Trip; walk1M: number; walk2M: number; board: string; alight: string;
+  /** Cómo se llega al paradero: a pie o en bici (y la bici se deja en un biciestacionamiento). */
+  first: "walk" | "bike";
+  parking?: Parking;
+};
 
 /** Lugares de una red a menos de `maxM` de un punto, del más cercano al más lejano. */
-function placesNear(net: Network, p: { lat: number; lng: number }, maxM: number, n = 3) {
-  const best = new Map<string, number>();
+function placesNear(net: Network, p: { lat: number; lng: number }, maxM: number, n = 3, needParking = false) {
+  const best = new Map<string, { d: number; parking?: Parking }>();
   for (const s of Object.values(net.stops)) {
     const d = distanceM(p, s);
-    if (d <= maxM && d < (best.get(s.place) ?? Infinity)) best.set(s.place, d);
+    if (d > maxM || d >= (best.get(s.place)?.d ?? Infinity)) continue;
+    if (needParking) {
+      const parking = nearestParking(s, 200);
+      if (!parking) continue;
+      best.set(s.place, { d, parking });
+    } else best.set(s.place, { d });
   }
-  return [...best].sort((a, b) => a[1] - b[1]).slice(0, n);
+  return [...best].sort((a, b) => a[1].d - b[1].d).slice(0, n);
 }
 
 /**
  * Mejores combinados entre dos direcciones, uno por red (como máximo 1.2 km a pie en cada punta).
  * Se ordenan por un costo simple: metros a pie + metros en el vehículo / 4 (el bus avanza ~4 veces más rápido).
  */
-export function findCombos(a: Place, b: Place, maxWalkM = 1200): Combo[] {
+export function findCombos(a: Place, b: Place, maxWalkM = 1200, withBike = false): Combo[] {
   const out: Combo[] = [];
   for (const net of NETWORKS) {
-    let best: (Combo & { score: number }) | null = null;
-    for (const [from, d1] of placesNear(net, a, maxWalkM)) {
-      for (const [to, d2] of placesNear(net, b, maxWalkM)) {
-        if (from === to) continue;
-        const trip = findTrip(net, from, to);
-        if (!trip) continue;
-        const score = (d1 + d2) * 1.25 + rideDistanceM(net, trip) / 4;
-        if (!best || score < best.score) best = { net, trip, walk1M: d1 * 1.25, walk2M: d2 * 1.25, board: from, alight: to, score };
+    for (const first of withBike ? (["walk", "bike"] as const) : (["walk"] as const)) {
+      let best: (Combo & { score: number }) | null = null;
+      // En bici se llega desde más lejos (hasta 3.5 km), pero solo a paraderos con biciestacionamiento cerca.
+      const starts = first === "bike" ? placesNear(net, a, 3500, 4, true) : placesNear(net, a, maxWalkM);
+      for (const [from, s1] of starts) {
+        for (const [to, s2] of placesNear(net, b, maxWalkM)) {
+          if (from === to) continue;
+          const trip = findTrip(net, from, to);
+          if (!trip) continue;
+          const lead = first === "bike" ? (s1.d * 1.25) / 3.5 : s1.d * 1.25; // la bici avanza ~3.5 veces más que a pie
+          const score = lead + s2.d * 1.25 + rideDistanceM(net, trip) / 4;
+          if (!best || score < best.score) best = { net, trip, walk1M: s1.d * 1.25, walk2M: s2.d * 1.25, board: from, alight: to, first, parking: s1.parking, score };
+        }
       }
+      if (best) { const { score: _s, ...c } = best; out.push(c); }
     }
-    if (best) { const { score: _s, ...c } = best; out.push(c); }
   }
   return out;
 }

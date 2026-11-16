@@ -2,7 +2,7 @@ import { BalconCajon } from "./ui/LimaIcons";
 import { useState } from "react";
 import { ArrowLeftRight, ArrowRight, CloudOff, Loader2, Trash2, Wallet, X } from "lucide-react";
 import { soles } from "../lib/engine";
-import { modeLabel, monthSummary, type SavedTrip } from "../lib/savings";
+import { BIKE_TRIPS_PER_DAY_OFF, modeLabel, monthSummary, type SavedTrip } from "../lib/savings";
 import { Button, Card, StatTile } from "./ui/primitives";
 
 const fmtDate = (iso: string) =>
@@ -92,23 +92,27 @@ export function MySavings(p: Props) {
 
   return (
     <Card id="mis-ahorros" className="scroll-mt-24 p-6 sm:p-10" labelledBy="savings-title">
-      <h2 id="savings-title" className="text-xl text-ink">Mis ahorros</h2>
+      <h2 id="savings-title" className="text-xl text-ink">Mi bitácora</h2>
 
       {p.list.length === 0 ? (
         <div className="mt-6 flex flex-col items-center gap-3 rounded-tile border border-dashed border-line px-6 py-10 text-center">
           <BalconCajon className="size-12 text-primary" />
           <p className="max-w-sm text-muted">
-            Todavía no guardas ningún ahorro. Calcula un tramo y toca <strong>Guardar mi ahorro</strong>: aquí verás lo que le ganas a la ciudad.
+            Todavía no registras viajes. Calcula un tramo y toca <strong>Registrar este viaje</strong>: aquí verás tus kilómetros, lo que ahorras y tus viajes en bici.
           </p>
         </div>
       ) : (
         <>
           <p className="mt-1 text-sm text-muted">Este mes</p>
-          <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+            <StatTile label="Viajes" value={`${m.trips}${m.km ? ` · ${m.km.toLocaleString("es-PE")} km` : ""}`} icon="footprints" tone="info" />
             <StatTile label="Ahorrado" value={soles(m.amount)} icon="dollar" tone="success" />
-            <StatTile label="Tramos guardados" value={`${m.trips} (${m.active} sin bus)`} icon="footprints" tone="info" />
             <StatTile label="Energía" value={`${m.kcal.toLocaleString("es-PE")} kcal`} icon="flame" tone="energy" />
+            <StatTile label="Viajes en bici" value={`${m.bikeTrips % BIKE_TRIPS_PER_DAY_OFF} de ${BIKE_TRIPS_PER_DAY_OFF}`} icon="bike" tone="highlight" />
           </div>
+          <p className="mt-2 text-xs text-subtle">
+            Viajes en bici: en el sector público, la Ley 30936 da un día libre por cada {BIKE_TRIPS_PER_DAY_OFF} viajes certificados. Lo valida tu institución; YIO solo lleva la cuenta.
+          </p>
 
           {/* Oculto hasta que exista un acuerdo real con una billetera (Fase 2): hoy confunde, YIO no es billetera. */}
           {SHOW_WALLET && <WalletPanel loggedIn={p.loggedIn} onLogin={p.onLogin} tappId={p.tappId} onSaveTappId={p.onSaveTappId} />}
@@ -118,7 +122,7 @@ export function MySavings(p: Props) {
               <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
                 <span className="flex flex-wrap items-center gap-x-2 text-ink">
                   {t.from} <ArrowRight className="size-3.5 text-muted" /> {t.to}
-                  <span className="text-muted">· {modeLabel(t.mode)}{t.route ? ` · ${t.route}` : ""}</span>
+                  <span className="text-muted">· {t.mode === "bus" && t.route ? t.route : modeLabel(t.mode)}{t.km ? ` · ${t.km.toLocaleString("es-PE")} km` : ""}</span>
                   {t.pending && <span className="inline-flex items-center gap-1 text-xs text-warning-text"><CloudOff className="size-3.5" /> por subir</span>}
                 </span>
                 <span className="flex items-center gap-3 text-muted">

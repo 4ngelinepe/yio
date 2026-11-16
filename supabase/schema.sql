@@ -43,3 +43,6 @@ alter table public.savings add constraint savings_mode_check check (mode in ('wa
 alter table public.savings drop constraint if exists savings_mode_check;
 alter table public.savings add constraint savings_mode_check check (mode in ('walk', 'bike', 'scooter', 'bus'));
 alter table public.savings add column if not exists route text check (char_length(route) <= 40);
+
+-- Bitácora (nov 2026): distancia de cada viaje, en km. Idempotente.
+alter table public.savings add column if not exists km numeric check (km >= 0 and km <= 300);
