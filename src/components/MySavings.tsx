@@ -22,6 +22,8 @@ type Props = {
 };
 
 /** Paso previo a TAPP: el usuario deja su alias para cuando la transferencia esté disponible. */
+const SHOW_WALLET = false;
+
 function WalletPanel({ loggedIn, onLogin, tappId, onSaveTappId }: Pick<Props, "loggedIn" | "onLogin" | "tappId" | "onSaveTappId">) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(tappId);
@@ -108,7 +110,8 @@ export function MySavings(p: Props) {
             <StatTile label="Energía" value={`${m.kcal.toLocaleString("es-PE")} kcal`} icon="flame" tone="energy" />
           </div>
 
-          <WalletPanel loggedIn={p.loggedIn} onLogin={p.onLogin} tappId={p.tappId} onSaveTappId={p.onSaveTappId} />
+          {/* Oculto hasta que exista un acuerdo real con una billetera (Fase 2): hoy confunde, YIO no es billetera. */}
+          {SHOW_WALLET && <WalletPanel loggedIn={p.loggedIn} onLogin={p.onLogin} tappId={p.tappId} onSaveTappId={p.onSaveTappId} />}
 
           <ul className="mt-6 divide-y divide-line rounded-tile border border-line">
             {p.list.slice(0, 20).map((t) => (

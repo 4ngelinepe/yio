@@ -8,6 +8,7 @@ import { cx } from "../lib/tones";
 import { aqiLabel, isPeak, PEAK_LABEL } from "../lib/engine";
 import { Icon } from "./ui/Icon";
 import { Farol, VentanaReja } from "./ui/LimaIcons";
+import { USUAL_LABEL, type UsualMode } from "../lib/engine";
 import { Button, Card } from "./ui/primitives";
 
 type Props = {
@@ -36,6 +37,8 @@ type Props = {
   onHasBike: (v: boolean) => void;
   hasScooter: boolean;
   onHasScooter: (v: boolean) => void;
+  usual: UsualMode;
+  onUsual: (v: UsualMode) => void;
   onCalculate: () => void;
   loading: boolean;
 };
@@ -387,6 +390,15 @@ export function DailyRecommendation(p: Props) {
           <input type="checkbox" checked={p.hasScooter} onChange={(e) => p.onHasScooter(e.target.checked)} className="size-5 accent-[var(--primary)]" />
           <Scooter className="size-5 text-muted" /> Scooter
         </label>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-ink">
+        <label htmlFor="usual" className="text-sm text-muted">Normalmente hago este tramo en:</label>
+        <select id="usual" value={p.usual} onChange={(e) => p.onUsual(e.target.value as UsualMode)}
+          className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
+          {(Object.keys(USUAL_LABEL) as UsualMode[]).map((k) => <option key={k} value={k}>{USUAL_LABEL[k]}</option>)}
+        </select>
+        <span className="text-xs text-muted">El ahorro se calcula contra esto.</span>
       </div>
 
       <div className="mt-8">

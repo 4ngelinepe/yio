@@ -34,7 +34,14 @@ export type EngineInput = {
   streets?: StreetTimes | null;
   hasBike: boolean;
   hasScooter: boolean;
+  /** Cómo iría la persona normalmente: el ahorro se mide contra esto, no contra el taxi. */
+  usual?: UsualMode;
 };
+
+export type UsualMode = "bus" | "taxi" | "auto" | "walk";
+export const USUAL_LABEL: Record<UsualMode, string> = { bus: "bus o combi", taxi: "taxi o app", auto: "auto propio", walk: "a pie" };
+/** Pasaje referencial de bus o combi convencional en Lima. */
+const USUAL_BUS: [number, number] = [1.5, 3];
 
 const round = (n: number) => Math.max(1, Math.round(n));
 const roundHalf = (n: number) => Math.round(n * 2) / 2;
@@ -340,24 +347,30 @@ export function recommend(input: EngineInput): Recommendation | null {
   const rec = { walk, bike, scooter, bus }[recommended];
   const viaCombo = !!combo && recommended === "bus";
   const active = recommended !== "bus";
-  const savings: Range =
-    active && fare === 0 ? taxi.cost
-    : active ? [fare, taxi.cost[1]]
-    : [Math.max(0, taxi.cost[0] - fare), Math.max(0, taxi.cost[1] - fare)];
+  // Ahorro real: contra cómo iría la persona normalmente (por defecto, bus o combi), no contra el peor caso.
+  const usual: UsualMode = input.usual ?? "bus";
+  const autoCost: Range = [roundHalf(taxiKm * 0.4), roundHalf(taxiKm * 0.6)];
+  const baseline: Range = usual === "taxi" ? taxi.cost : usual === "auto" ? autoCost : usual === "bus" ? USUAL_BUS : [0, 0];
+  const recCost = active ? 0 : fare;
+  const savings: Range = [Math.max(0, baseline[0] - recCost), Math.max(0, baseline[1] - recCost)];
 
   // Cómo se llega al ahorro de hoy, en palabras.
-  const modeName = { walk: "caminando", bike: "en bici", scooter: "en scooter", bus: "" }[recommended];
-  const savingsHow: string[] = active
-    ? [
-        `Vas ${modeName}: tu viaje cuesta S/ 0.`,
-        noBus && !combo ? null : fare > 0 ? `Frente ${busName.startsWith("el ") ? "al " + busName.slice(3) : "a " + busName}: ahorras el pasaje, ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis, así que frente a él no hay diferencia.`,
-        `Frente a un taxi (${solesRange(taxi.cost)} por ${taxiKm.toFixed(1)} km): ahorras hasta ${soles(taxi.cost[1])}.`,
-      ].filter((x): x is string => !!x)
-    : [
-        `Un taxi por este tramo (${taxiKm.toFixed(1)} km) cuesta ${solesRange(taxi.cost)}.`,
-        fare > 0 ? `En ${busName} pagas ${soles(fare)}.` : `${busName.charAt(0).toUpperCase()}${busName.slice(1)} es gratis.`,
-        `Diferencia: ${solesRange(savings)}.`,
-      ];
+  const modeName = { walk: "a pie", bike: "en bici", scooter: "en scooter", bus: `en ${busName}` }[recommended];
+  const baselineWords =
+    usual === "taxi" ? `Normalmente irías en taxi o app: ${solesRange(taxi.cost)} por ${taxiKm.toFixed(1)} km.`
+    : usual === "auto" ? `Normalmente irías en tu auto: unos ${solesRange(autoCost)} de combustible por ${taxiKm.toFixed(1)} km (estimado, sin estacionamiento).`
+    : usual === "bus" ? `Normalmente irías en bus o combi: un pasaje de ${solesRange(USUAL_BUS)} (referencial).`
+    : "Normalmente irías a pie: no gastas nada.";
+  const savingsHow: string[] = [
+    baselineWords,
+    `Hoy vas ${modeName}: ${recCost > 0 ? `pagas ${soles(recCost)}` : "tu viaje cuesta S/ 0"}.`,
+    savings[1] > 0
+      ? `Ahorras ${solesRange(savings)} frente a lo de siempre.`
+      : usual === "walk" && active
+        ? "Ya ibas a pie: hoy no hay ahorro en plata, pero sumas actividad."
+        : `Hoy no ahorras plata${recCost > 0 ? `: pagas ${soles(recCost)} a cambio de llegar antes` : ""}.`,
+    usual !== "taxi" ? `Como referencia, un taxi costaría ${solesRange(taxi.cost)}.` : null,
+  ].filter((x): x is string => !!x);
 
   const monthly: Range = [savings[0] * 20, savings[1] * 20];
   const walkKm = walkM / 1000;
