@@ -169,6 +169,7 @@ Una sola tabla, `public.savings`: los ahorros que cada usuario guarda. Esquema c
 | Ciclovías y cicloparqueaderos | Pedalea Seguro 2.0 (ArcGIS, datos Banco Mundial 2023) | Directo desde el navegador | Público | OK |
 | Biciestacionamientos | Pedalea Seguro 2.0 (capa Cicloparqueaderos_Agrupado, 2023) | Archivo en el repo (`src/data/bikeparking.json`) | Público; sin capacidad ni horario | OK, revisar vigencia |
 | Buscador de lugares y autocompletar | HeiGIT Pelias | Puente `places`, misma clave ORS_KEY | Plan gratuito: 1000 búsquedas y 1000 autocompletados al día | OK |
+| Distrito de cada resultado | Límites distritales del IGN (50 distritos de Lima y Callao), vía github.com/joseluisq/peru-geojson-datasets | Archivo dentro de la app (`src/data/districts.json`, 110 KB, se carga al buscar) | Sin límite: se calcula en el teléfono | OK |
 | Buscador de respaldo | Nominatim (OpenStreetMap) | Directo desde el navegador, solo si `places` falla | 1 consulta por segundo, sin autocompletar | Solo respaldo |
 | Mapa base | Teselas de OpenStreetMap | Directo desde el navegador | Uso moderado, con atribución | Reemplazar antes de crecer |
 

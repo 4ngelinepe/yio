@@ -6,6 +6,7 @@
  * - Llegadas del Expreso San Isidro: Zenbus (protobuf), vía supabase/functions/esi-arrivals.
  *   Si no responden, YIO usa frecuencias estimadas.
  */
+import { withDistrict } from "./district";
 import type { IconName } from "../data/content";
 import { ARRIVALS_URL, ESI_ARRIVALS_URL, PLACES_URL, STREET_TIMES_URL } from "./supabase";
 import type { Network, Trip } from "../data/networks";
@@ -148,7 +149,7 @@ export async function getStreetTimes(a: { lat: number; lng: number }, b: { lat: 
 }
 
 /* ───────── Buscador de lugares ───────── */
-export type FoundPlace = { name: string; detail: string; lat: number; lng: number };
+export type FoundPlace = { name: string; detail: string; lat: number; lng: number; street?: string };
 
 /**
  * Busca lugares en Lima.
@@ -159,10 +160,10 @@ export type FoundPlace = { name: string; detail: string; lat: number; lng: numbe
 export async function searchPlaces(q: string, mode: "auto" | "search" = "search"): Promise<FoundPlace[] | null> {
   try {
     const d = (await getJson(`${PLACES_URL}?${new URLSearchParams({ q, mode })}`, mode === "auto" ? 3500 : 5000)) as { places?: FoundPlace[] };
-    if (Array.isArray(d.places)) return d.places;
+    if (Array.isArray(d.places)) return withDistrict(d.places);
   } catch { /* sigue con el plan B */ }
   if (mode === "auto") return null;
-  return searchNominatim(q);
+  return withDistrict(await searchNominatim(q));
 }
 
 async function searchNominatim(q: string): Promise<FoundPlace[]> {

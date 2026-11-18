@@ -23,7 +23,7 @@ const json = (body: unknown, status = 200) =>
     headers: { ...CORS, "Content-Type": "application/json", "Cache-Control": status === 200 ? "public, max-age=86400" : "no-store" },
   });
 
-type Place = { name: string; detail: string; lat: number; lng: number };
+type Place = { name: string; detail: string; lat: number; lng: number; street?: string };
 const cache = new Map<string, { t: number; places: Place[] }>();
 const DAY = 86_400_000;
 
@@ -54,7 +54,9 @@ function toPlaces(features: any[]): Place[] {
     const id = `${name}|${lat.toFixed(4)}|${lng.toFixed(4)}`;
     if (seen.has(id)) continue;
     seen.add(id);
-    out.push({ name, detail, lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)) });
+    // Calle y número cuando OpenStreetMap los tiene ("Av. Brasil 1234"); el distrito lo pone la app.
+    const street = p.street ? clean(`${p.street}${p.housenumber ? " " + p.housenumber : ""}`) : undefined;
+    out.push({ name, detail, lat: Number(lat.toFixed(6)), lng: Number(lng.toFixed(6)), ...(street ? { street } : {}) });
   }
   return out.slice(0, 6);
 }
