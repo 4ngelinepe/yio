@@ -528,6 +528,7 @@ export function recommend(input: EngineInput): Recommendation | null {
     noBus: noBus && !viaCombo,
     tooFar: noBus && recommended === "walk" && wm > 75,
     roundTrip: legs === 2,
+    usual,
     co2,
     km: legs * Math.round((viaCombo ? (combo!.c.walk1M + combo!.c.walk2M) / 1000 + (rideDistanceM(combo!.c.net, combo!.c.trip) * 1.05) / 1000 : active ? walkM / 1000 : rideKm) * 10) / 10,
     parking: viaCombo && combo!.c.parking

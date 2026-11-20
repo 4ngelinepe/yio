@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Map as MapIcon } from "lucide-react";
 import { brand, themes, type ThemeName } from "./config/brand";
 import type { GoalId, Recommendation } from "./data/content";
 import { NETWORKS, destinationGroups, findTrip, freeNetwork, nearestPlace, networkById, placeGroups, type NetworkId, type Place } from "./data/networks";
@@ -39,6 +40,7 @@ export default function App() {
     try { const v = localStorage.getItem("yio.goal"); return v === "rapido" || v === "ahorro" || v === "bienestar" ? v : "ahorro"; } catch { return "ahorro"; }
   });
   useEffect(() => { try { localStorage.setItem("yio.goal", goal); } catch { /* noop */ } }, [goal]);
+  const [mapOpen, setMapOpen] = useState(false);
   const [networkId, setNetworkId] = useState<NetworkId | "libre">(() => {
     try {
       const v = localStorage.getItem("yio.network");
@@ -222,6 +224,7 @@ export default function App() {
       r = recommend({ network: net, from, to, goal, now: new Date(), weather, air, busEta, streets, hasBike, hasScooter, usual, car, roundTrip });
     }
     setResult(r);
+    setMapOpen(false);
     setBikeCov(null);
     setSaveState({ kind: "idle" });
     // Ciclovías en la ruta en bici (en segundo plano, no frena la recomendación)
@@ -356,12 +359,25 @@ export default function App() {
         />
 
         {result && (
-          <div ref={resultsRef} className="scroll-mt-24 space-y-10">
-            <CorridorStatus data={result} />
+          <div ref={resultsRef} className="scroll-mt-24 space-y-6">
             <RouteSummary data={result} save={saveState} onSave={save} />
-            <MapSection route={result.route} path={result.path} theme={theme} bikePath={result.bikePath} bikeCov={bikeCov} noBus={result.noBus} parking={result.parking}
-              autoBikes={hasBike || hasScooter || result.recommended === "bike" || result.recommended === "scooter"} />
+            {/* El mapa es apoyo: plegado hasta que lo pidas */}
+            {mapOpen ? (
+              <div className="space-y-2">
+                <MapSection route={result.route} path={result.path} theme={theme} bikePath={result.bikePath} bikeCov={bikeCov} noBus={result.noBus} parking={result.parking}
+                  autoBikes={hasBike || hasScooter || result.recommended === "bike" || result.recommended === "scooter"} />
+                <button type="button" onClick={() => setMapOpen(false)} className="text-sm text-primary underline">Ocultar el mapa</button>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setMapOpen(true)} aria-expanded={false}
+                className="flex w-full items-center gap-3 rounded-tile bg-primary-soft px-5 py-4 text-left text-primary-text hover:opacity-90">
+                <MapIcon className="size-5 shrink-0" aria-hidden />
+                <span className="flex-1 font-medium">Ver la ruta en el mapa</span>
+                <ChevronDown className="size-5 shrink-0" aria-hidden />
+              </button>
+            )}
             <DirectComparison data={result} bikeCov={bikeCov} />
+            <CorridorStatus data={result} />
             <CumulativeImpact data={result.impact} />
           </div>
         )}

@@ -73,6 +73,8 @@ export type Recommendation = {
   tooFar?: boolean;
   /** CO₂ que no emitiste frente a lo de siempre, en kg (ya incluye ida y vuelta). */
   co2?: number;
+  /** Cómo hace la persona este tramo normalmente (base del ahorro). */
+  usual?: "bus" | "taxi" | "auto" | "walk";
   /** Si el ahorro, los km y la energía cuentan ida y vuelta. */
   roundTrip?: boolean;
   /** Distancia del viaje recomendado, en km (por dos si es ida y vuelta). */
