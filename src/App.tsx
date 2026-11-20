@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Map as MapIcon } from "lucide-react";
+import { loadTrip, Tracker, type TrackState, type TripResult } from "./lib/tracker";
+import { TripBar, TripDone } from "./components/TripBar";
 import { brand, themes, type ThemeName } from "./config/brand";
 import type { GoalId, Recommendation } from "./data/content";
 import { NETWORKS, destinationGroups, findTrip, freeNetwork, nearestPlace, networkById, placeGroups, type NetworkId, type Place } from "./data/networks";
@@ -41,6 +43,21 @@ export default function App() {
   });
   useEffect(() => { try { localStorage.setItem("yio.goal", goal); } catch { /* noop */ } }, [goal]);
   const [mapOpen, setMapOpen] = useState(false);
+  // Viaje medido con el GPS (Iniciar / Terminar)
+  const tracker = useRef<Tracker | null>(null);
+  const [track, setTrack] = useState<TrackState | null>(null);
+  const [trackErr, setTrackErr] = useState<string | null>(null);
+  const [tripDone, setTripDone] = useState<TripResult | null>(null);
+  const startTrip = (resume?: TrackState) => {
+    if (tracker.current) return;
+    setTrackErr(null);
+    const t = new Tracker((st) => { setTrack(st); setTrackErr(null); }, setTrackErr, resume);
+    tracker.current = t; setTrack({ ...t.state }); t.start();
+  };
+  const stopTrip = () => { const r = tracker.current?.stop(); tracker.current = null; setTrack(null); if (r) setTripDone(r); };
+  const cancelTrip = () => { tracker.current?.cancel(); tracker.current = null; setTrack(null); };
+  // Si se recargó la página a mitad de un viaje, se retoma.
+  useEffect(() => { const t = loadTrip(); if (t && Date.now() - t.startedAt < 6 * 3600 * 1000) startTrip(t); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const [networkId, setNetworkId] = useState<NetworkId | "libre">(() => {
     try {
       const v = localStorage.getItem("yio.network");
@@ -252,20 +269,23 @@ export default function App() {
     try { setSaved(await loadRemote()); } catch { /* noop */ }
   }
 
-  const save = async () => {
+  const save = async (measured?: TripResult) => {
     if (!result || saveState.kind === "saving" || saveState.kind === "saved") return;
     const rec = result.options.find((o) => o.id === result.recommended)!;
+    // Medido: es un solo tramo, con sus km reales; el ahorro, el CO₂ y la energía son de ese tramo.
+    const legs = result.roundTrip ? 2 : 1;
+    const part = measured ? 1 / legs : 1;
     const trip: SavedTrip = {
       id: result.createdAt,
       date: result.createdAt,
       from: result.route.from,
       to: result.route.to,
       mode: result.recommended,
-      route: result.noBus ? undefined : result.options.find((o) => o.id === "bus")?.title,
-      km: result.km,
-      co2: result.co2,
-      amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * 100) / 100,
-      kcal: rec.kcal * (result.roundTrip ? 2 : 1),
+      route: [result.noBus ? null : result.options.find((o) => o.id === "bus")?.title, measured ? "medido" : null].filter(Boolean).join(" · ") || undefined,
+      km: measured ? measured.km : result.km,
+      co2: result.co2 != null ? Math.round(result.co2 * part * 10) / 10 : undefined,
+      amount: Math.round(((result.savings[0] + result.savings[1]) / 2) * part * 100) / 100,
+      kcal: Math.round(rec.kcal * (measured ? 1 : legs)),
     };
     if (!email) {
       setSaved((list) => [trip, ...list]);
@@ -360,7 +380,7 @@ export default function App() {
 
         {result && (
           <div ref={resultsRef} className="scroll-mt-24 space-y-6">
-            <RouteSummary data={result} save={saveState} onSave={save} />
+            <RouteSummary data={result} save={saveState} onSave={() => save()} tracking={!!track} onStartTrip={() => startTrip()} />
             {/* El mapa es apoyo: plegado hasta que lo pidas */}
             {mapOpen ? (
               <div className="space-y-2">
@@ -393,9 +413,16 @@ export default function App() {
           onSaveTappId={saveTappId}
         />
       </main>
+      {track && <div className="h-24" aria-hidden />}
+      {track && <TripBar state={track} error={trackErr} onStop={stopTrip} onCancel={cancelTrip} />}
+      {tripDone && (
+        <TripDone trip={tripDone}
+          onSave={() => { const t = tripDone; setTripDone(null); if (result) void save(t); }}
+          onDiscard={() => setTripDone(null)} />
+      )}
 
       <Footer />
-      <HelpButton onOpen={() => setHowOpen(true)} />
+      {!track && <HelpButton onOpen={() => setHowOpen(true)} />}
       {howOpen && !loginOpen && <HowItWorks onClose={() => setHowOpen(false)} />}
       {loginOpen && <LoginPanel onClose={() => setLoginOpen(false)} />}
       {brand.showThemeSwitcher && <ThemeSwitcher value={theme} onChange={setTheme} />}

@@ -1,5 +1,5 @@
 import { PortadaArco, Cactus } from "./ui/LimaIcons";
-import { ArrowRight, Bookmark, BookmarkCheck, Loader2 } from "lucide-react";
+import { ArrowRight, Bookmark, BookmarkCheck, Loader2, Navigation } from "lucide-react";
 import type { Recommendation } from "../data/content";
 import { minRange, soles, solesRange, USUAL_LABEL } from "../lib/engine";
 import { Button, Card, StatTile } from "./ui/primitives";
@@ -20,8 +20,8 @@ const headline = (r: Recommendation) => {
 
 const DAYS = 20;
 
-export function RouteSummary({ data, save, onSave }: {
-  data: Recommendation; save: SaveState; onSave: () => void;
+export function RouteSummary({ data, save, onSave, tracking, onStartTrip }: {
+  data: Recommendation; save: SaveState; onSave: () => void; tracking?: boolean; onStartTrip?: () => void;
 }) {
   const { route } = data;
   const saved = save.kind === "saved";
@@ -90,14 +90,23 @@ export function RouteSummary({ data, save, onSave }: {
       </details>
 
       <div className="mt-6 flex flex-col gap-3">
+        {onStartTrip && !saved && (
+          <>
+            <Button className="w-full" onClick={onStartTrip} disabled={tracking} icon={<Navigation className="size-5" />}>
+              {tracking ? "Midiendo tu viaje…" : "Iniciar viaje"}
+            </Button>
+            {!tracking && <p className="-mt-1 text-center text-xs text-muted">Mide los km reales con el GPS mientras YIO está abierta.</p>}
+          </>
+        )}
         <Button
+          variant="secondary"
           className="w-full"
           aria-pressed={saved}
           disabled={saved || save.kind === "saving"}
           onClick={onSave}
           icon={save.kind === "saving" ? <Loader2 className="size-5 animate-spin" /> : saved ? <BookmarkCheck className="size-5" /> : <Bookmark className="size-5" />}
         >
-          {save.kind === "saving" ? "Registrando…" : saved ? "Viaje registrado" : "Registrar este viaje"}
+          {save.kind === "saving" ? "Registrando…" : saved ? "Viaje registrado" : "Registrar sin medir"}
         </Button>
         <p aria-live="polite" className="text-sm">
           {saved && (
