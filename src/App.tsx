@@ -35,12 +35,15 @@ function initialTheme(): ThemeName {
 
 export default function App() {
   const [theme, setTheme] = useState<ThemeName>(initialTheme);
-  const [goal, setGoal] = useState<GoalId>("ahorro");
+  const [goal, setGoal] = useState<GoalId>(() => {
+    try { const v = localStorage.getItem("yio.goal"); return v === "rapido" || v === "ahorro" || v === "bienestar" ? v : "ahorro"; } catch { return "ahorro"; }
+  });
+  useEffect(() => { try { localStorage.setItem("yio.goal", goal); } catch { /* noop */ } }, [goal]);
   const [networkId, setNetworkId] = useState<NetworkId | "libre">(() => {
     try {
       const v = localStorage.getItem("yio.network");
-      return v === "libre" || NETWORKS.some((n) => n.id === v) ? (v as NetworkId | "libre") : "rojo";
-    } catch { return "rojo"; }
+      return v === "libre" || NETWORKS.some((n) => n.id === v) ? (v as NetworkId | "libre") : "libre";
+    } catch { return "libre"; }
   });
   const libre = networkId === "libre";
   const net = (!libre && networkById(networkId)) || networkById("rojo");

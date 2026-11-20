@@ -37,3 +37,10 @@ export function remember(s: SavedPlaces, p: Place): SavedPlaces {
 
 export const slotOf = (s: SavedPlaces, p: Place): SlotId | null =>
   s.casa && same(s.casa, p) ? "casa" : s.trabajo && same(s.trabajo, p) ? "trabajo" : null;
+
+/** Borra un lugar de los recientes (la × de cada etiqueta). */
+export function forget(s: SavedPlaces, p: Place): SavedPlaces {
+  const next = { ...s, recent: s.recent.filter((r) => !same(r, p)) };
+  store(next);
+  return next;
+}

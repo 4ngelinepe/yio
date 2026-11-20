@@ -5,20 +5,20 @@ import { Button } from "./ui/primitives";
 
 const STEPS: { title: string; body: string }[] = [
   {
-    title: "Elige cómo vas",
-    body: "Por dirección, si quieres que YIO arme el camino: a pie, en bici o combinado con bus o Metro. O un corredor: Rojo, Expreso San Isidro (gratis y eléctrico) o Metro Línea 1.",
+    title: "Dinos a dónde vas",
+    body: "Desde tu ubicación (o el lugar que busques) hasta tu destino. Al tocar un campo aparecen Casa, Trabajo y tus recientes; los recientes se borran con su ×.",
   },
   {
-    title: "Marca tu tramo",
-    body: "Por dirección usas tu ubicación y buscas a dónde vas. Con un corredor eliges el paradero de subida y el de bajada.",
+    title: "Toca «¿Cómo me conviene ir?»",
+    body: "YIO compara caminar, bus, Metro y taxi con el clima, el aire y el tráfico de ahora. Caminar siempre cuenta: es lo que todos hacemos.",
   },
   {
-    title: "Dinos qué buscas hoy",
-    body: "Llegar rápido, ahorrar plata o moverte más. Si tienes bici o scooter a la mano, márcalo.",
+    title: "Ajusta solo si hace falta",
+    body: "En «Ajustes del viaje» dices cómo vas normalmente, si es ida y vuelta, qué buscas hoy y si tienes bici o scooter. Se guardan para la próxima.",
   },
   {
-    title: "YIO te dice qué conviene",
-    body: "Compara caminar, bici, scooter, bus y taxi con el clima, el aire y el tráfico de ahora. Si te sirve, guarda tu ahorro.",
+    title: "Mira lo que ganas",
+    body: "Cuánto te cuesta moverte, cuánta plata ahorras frente a lo de siempre, cuánto te mueves y el CO₂ que no emites. Si te sirve, registra el viaje.",
   },
 ];
 

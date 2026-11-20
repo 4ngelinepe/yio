@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowDown, Bike, Briefcase, History, Home, Loader2, LocateFixed, MapPin, Scooter, Search, X } from "lucide-react";
-import { loadSaved, remember, setSlot, slotOf, type SavedPlaces, type SlotId } from "../lib/places";
+import { ArrowDown, Bike, Briefcase, ChevronDown, History, Home, Loader2, LocateFixed, MapPin, Scooter, Search, SlidersHorizontal, Star, X } from "lucide-react";
+import { forget, loadSaved, remember, setSlot, slotOf, type SavedPlaces, type SlotId } from "../lib/places";
 import { goals, type GoalId } from "../data/content";
 import type { Network, NetworkId, Place, PlaceGroup } from "../data/networks";
 import { searchPlaces, type Air, type FoundPlace, type Weather } from "../lib/live";
@@ -75,11 +75,6 @@ function StopSelect({ id, label, value, groups, placeholder, disabled, onChange 
   );
 }
 
-/** Número de paso, igual que en "¿Cómo funciona?". */
-function Step({ n }: { n: number }) {
-  return <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-primary-soft text-sm font-medium text-primary-text">{n}</span>;
-}
-
 /** Lima aproximada: el cálculo de calles solo funciona dentro de esta caja. */
 const inLima = (lat: number, lng: number) => lat > -12.6 && lat < -11.6 && lng > -77.3 && lng < -76.6;
 
@@ -92,7 +87,10 @@ function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
   const [found, setFound] = useState<FoundPlace[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [empty, setEmpty] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
   const seq = useRef(0);
+  const box = useRef<HTMLDivElement>(null);
 
   // Autocompletar: sugerencias mientras escribes (si el puente del buscador responde).
   useEffect(() => {
@@ -112,7 +110,7 @@ function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
     seq.current++;
     onChange(pl);
     onSaved(remember(saved, pl));
-    setFound(null); setQ(""); setEmpty(false); setMsg(null);
+    setFound(null); setQ(""); setEmpty(false); setMsg(null); setFocused(false);
   };
 
   const search = async (e: FormEvent) => {
@@ -137,7 +135,7 @@ function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
         setBusy(null);
         const { latitude: lat, longitude: lng } = pos.coords;
         if (!inLima(lat, lng)) { setMsg("Estás fuera de Lima: YIO por ahora solo calcula tramos en Lima."); return; }
-        onChange({ name: "Mi ubicación", lat, lng });
+        onChange({ name: "Mi ubicación", lat, lng }); setFocused(false);
       },
       () => { setBusy(null); setMsg("No pudimos ver tu ubicación. Revisa el permiso del navegador."); },
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
@@ -152,14 +150,18 @@ function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
         <div className="flex items-center gap-3 rounded-tile border-2 border-primary bg-primary-soft px-4 py-3 text-lg text-primary-text">
           {slot === "casa" ? <Home className="size-5 shrink-0" aria-hidden /> : slot === "trabajo" ? <Briefcase className="size-5 shrink-0" aria-hidden /> : <MapPin className="size-5 shrink-0" aria-hidden />}
           <span className="min-w-0 flex-1 truncate">{slot ? `${slot === "casa" ? "Casa" : "Trabajo"} · ` : ""}{value.name}</span>
-          <button type="button" onClick={() => { onChange(null); setFound(null); }} aria-label={`Cambiar ${label.toLowerCase()}`}
+          {!slot && value.name !== "Mi ubicación" && (
+            <button type="button" onClick={() => setSaveOpen((o) => !o)} aria-expanded={saveOpen} aria-label="Guardar como Casa o Trabajo"
+              className="rounded-full p-1 hover:bg-surface-muted"><Star className="size-4" /></button>
+          )}
+          <button type="button" onClick={() => { onChange(null); setFound(null); setSaveOpen(false); }} aria-label={`Cambiar ${label.toLowerCase()}`}
             className="rounded-full p-1 hover:bg-surface-muted"><X className="size-4" /></button>
         </div>
-        {!slot && value.name !== "Mi ubicación" && (
+        {saveOpen && !slot && value.name !== "Mi ubicación" && (
           <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
             Guardar como:
             {(["casa", "trabajo"] as SlotId[]).map((sl) => (
-              <button key={sl} type="button" onClick={() => onSaved(setSlot(saved, sl, value))}
+              <button key={sl} type="button" onClick={() => { onSaved(setSlot(saved, sl, value)); setSaveOpen(false); }}
                 className="inline-flex items-center gap-1 rounded-full border border-line px-2.5 py-1 text-ink hover:bg-surface-muted">
                 {sl === "casa" ? <Home className="size-3.5" /> : <Briefcase className="size-3.5" />}
                 {sl === "casa" ? "Casa" : "Trabajo"}{saved[sl] ? " (reemplaza)" : ""}
@@ -171,17 +173,19 @@ function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
     );
   }
 
-  const chips: { key: string; label: string; icon: React.ReactNode; place: Place }[] = [
+  const chips: { key: string; label: string; icon: React.ReactNode; place: Place; recent?: boolean }[] = [
     ...(saved.casa ? [{ key: "casa", label: "Casa", icon: <Home className="size-4" />, place: saved.casa }] : []),
     ...(saved.trabajo ? [{ key: "trabajo", label: "Trabajo", icon: <Briefcase className="size-4" />, place: saved.trabajo }] : []),
-    ...saved.recent.map((r, k) => ({ key: `r${k}`, label: r.name, icon: <History className="size-4" />, place: r })),
+    ...saved.recent.map((r, k) => ({ key: `r${k}`, label: r.name, icon: <History className="size-4" />, place: r, recent: true })),
   ];
+  // Los atajos aparecen solo con el campo activo (y no se cierran al tocarlos).
+  const onBlur = () => setTimeout(() => { if (!box.current?.contains(document.activeElement)) setFocused(false); }, 120);
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0" ref={box} onFocus={() => setFocused(true)} onBlur={onBlur}>
       <label htmlFor={id} className="mb-1.5 block text-sm text-muted">{label}</label>
       <form onSubmit={search} className="flex gap-2" role="search">
-        <input id={id} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Calle, lugar o distrito" autoComplete="off"
+        <input id={id} value={q} onChange={(e) => setQ(e.target.value)} placeholder={locate ? "Calle, lugar o distrito" : "¿A dónde vas?"} autoComplete="off"
           aria-autocomplete="list" aria-controls={`${id}-list`}
           className="min-w-0 flex-1 rounded-tile border-2 border-line bg-surface-muted px-4 py-3 text-lg text-ink placeholder:text-subtle focus:border-primary" />
         <button type="submit" disabled={!!busy} aria-label="Buscar"
@@ -189,19 +193,25 @@ function PlaceSearch({ id, label, value, onChange, locate, saved, onSaved }: {
           {busy === "search" ? <Loader2 className="size-5 animate-spin" /> : <Search className="size-5" />}
         </button>
       </form>
-      {!q && (locate || chips.length > 0) && (
-        <div className="mt-2 flex flex-wrap gap-2">
+      {!q && (locate || (focused && chips.length > 0)) && (
+        <div className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]" aria-label="Atajos">
           {locate && (
             <button type="button" onClick={gps} disabled={!!busy}
-              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-muted">
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-primary bg-primary-soft px-3 py-1.5 text-sm text-primary-text">
               {busy === "gps" ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />} Mi ubicación
             </button>
           )}
-          {chips.map((c) => (
-            <button key={c.key} type="button" onClick={() => pick(c.place)}
-              className="inline-flex max-w-[14rem] items-center gap-2 rounded-full border border-line px-3 py-1.5 text-sm text-ink hover:bg-surface-muted">
-              {c.icon}<span className="truncate">{c.label}</span>
-            </button>
+          {focused && chips.map((c) => (
+            <span key={c.key} className={cx("inline-flex max-w-[15rem] shrink-0 items-center rounded-full border text-sm",
+              c.recent ? "border-line text-ink" : "border-primary/30 bg-primary-soft text-primary-text")}>
+              <button type="button" onClick={() => pick(c.place)} className="inline-flex min-w-0 items-center gap-2 py-1.5 pl-3 pr-1">
+                {c.icon}<span className="truncate">{c.label}</span>
+              </button>
+              {c.recent ? (
+                <button type="button" onClick={() => onSaved(forget(saved, c.place))} aria-label={`Quitar ${c.label} de recientes`}
+                  className="mr-1 rounded-full p-1 text-subtle hover:bg-surface-muted hover:text-ink"><X className="size-3.5" /></button>
+              ) : <span className="w-2" />}
+            </span>
           ))}
         </div>
       )}
@@ -238,6 +248,7 @@ export function DailyRecommendation(p: Props) {
   const ready = libre ? !!p.origin && !!p.dest : !!p.from && !!p.to;
   const [locating, setLocating] = useState(false);
   const [locateMsg, setLocateMsg] = useState<string | null>(null);
+  const [sheet, setSheet] = useState(false);
 
   const locate = async () => {
     setLocating(true);
@@ -245,197 +256,177 @@ export function DailyRecommendation(p: Props) {
     setLocating(false);
   };
 
+  // Escape cierra la hoja de ajustes.
+  useEffect(() => {
+    if (!sheet) return;
+    const k = (e: KeyboardEvent) => { if (e.key === "Escape") setSheet(false); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [sheet]);
+
+  const extras = [p.hasBike ? "bici" : null, p.hasScooter ? "scooter" : null].filter(Boolean).join(" y ");
+  const netName = libre ? null : p.networks.find((n) => n.id === p.networkId)?.name;
+  const summary = [
+    `Voy en ${USUAL_LABEL[p.usual]}`,
+    p.roundTrip ? "ida y vuelta" : "solo ida",
+    goals.find((g) => g.id === p.goal)?.label.toLowerCase(),
+    extras ? `con ${extras}` : null,
+    netName ? `por ${netName}` : null,
+  ].filter(Boolean).join(" · ");
+
   return (
     <Card className="p-6 sm:p-10" labelledBy="goal-title">
-      {/* Hora, clima y aire en vivo, en una línea */}
+      {/* Hora, clima y aire en vivo, en una línea discreta */}
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
         <span className="font-medium tabular-nums text-ink">{p.clock}</span>
         <span>·</span>
         {p.liveLoading
           ? <Loader2 className="size-4 animate-spin text-energy" />
           : <Icon name={p.weather?.icon ?? "cloud"} className="size-5 text-energy" />}
-        <span className="text-ink">Lima</span>
         {p.weather ? (
           <>
-            <span>· {p.weather.temp}°C · {p.weather.label}</span>
-            {p.air && <span title={`Índice de calidad del aire: ${p.air.usAqi}`}>· Aire {aqiLabel(p.air.usAqi)}</span>}
+            <span>{p.weather.temp}°C · {p.weather.label}</span>
+            {p.weather.rainSoon && <span className="text-info-text">· posible lluvia</span>}
+            {p.air && <span title={`Índice de calidad del aire: ${p.air.usAqi}`}>· aire {aqiLabel(p.air.usAqi).toLowerCase()}</span>}
           </>
         ) : (
-          <span>· {p.liveLoading ? "cargando clima…" : "sin datos de clima ahora"}</span>
+          <span>{p.liveLoading ? "cargando clima…" : "Lima"}</span>
         )}
       </p>
-      {/* Pronóstico de las próximas horas */}
-      {p.weather && p.weather.next.length > 0 && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted" aria-label="Pronóstico de las próximas horas">
-          {p.weather.next.map((h) => (
-            <span key={h.hour} className="inline-flex items-center gap-1" title={h.label}>
-              <span className="tabular-nums">{h.hour}</span>
-              <Icon name={h.icon} className="size-4 text-energy" />
-              <span className="tabular-nums text-ink">{h.temp}°</span>
-              {h.rainProb >= 30 && <span className="text-info-text">{h.rainProb}%</span>}
-            </span>
-          ))}
-          <span className="text-subtle">
-            {p.weather.rainSoon ? "· Posible lluvia pronto" : p.dark ? `· Amanece ${p.weather.sunrise}` : `· Atardece ${p.weather.sunset}`}
-          </span>
-        </div>
-      )}
 
-      {/* 1 · Cómo vas */}
+      <h2 id="goal-title" className="mt-4 text-2xl font-semibold text-ink sm:text-3xl">¿A dónde vas hoy?</h2>
+
+      {/* Desde y hasta */}
       <div className="mt-5">
-        <h2 className="mb-4 flex items-center gap-3 text-lg text-ink"><Step n={1} />¿Cómo vas?</h2>
-        <div role="radiogroup" aria-label="Cómo vas" className="mb-4 flex flex-wrap gap-2">
-          <button
-            type="button" role="radio" aria-checked={libre}
-            onClick={() => p.onNetwork("libre")}
-            className={cx(
-              "inline-flex items-center gap-1.5 rounded-full border px-4 py-2 text-sm transition",
-              libre ? "border-primary bg-primary text-primary-fg" : "border-line text-ink hover:bg-surface-muted",
-            )}
-          >
-            <Icon name="footprints" className="size-4" />Por dirección
-            <span className={cx("text-xs", libre ? "opacity-80" : "text-success-text")}>· a pie, en bici o combinado</span>
-          </button>
-          {p.networks.map((n) => {
-            const active = n.id === p.networkId;
-            return (
-              <button
-                key={n.id} type="button" role="radio" aria-checked={active}
-                onClick={() => p.onNetwork(n.id)}
-                className={cx(
-                  "rounded-full border px-4 py-2 text-sm transition",
-                  active ? "border-primary bg-primary text-primary-fg" : "border-line text-ink hover:bg-surface-muted",
-                )}
-              >
-                {n.name}
-                {(n.fare === 0 || (n.electric && n.kind === "bus")) && (
-                  <span className={cx("ml-1.5 text-xs", active ? "opacity-80" : "text-success-text")}>
-                    · {[n.fare === 0 ? "gratis" : null, n.electric && n.kind === "bus" ? "eléctrico" : null].filter(Boolean).join(" · ")}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-          <span className="rounded-full border border-dashed border-line px-4 py-2 text-sm text-subtle">Azul y Morado · pronto</span>
-        </div>
-        {!libre && (() => {
-          const peak = isPeak(new Date());
-          return (
-            <p className={cx("-mt-1 mb-4 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs", peak ? "bg-warning-soft text-warning-text" : "bg-surface-muted text-muted")}>
-              <Icon name="traffic" className="size-4" />
-              {peak ? `Hora punta ahora: más tráfico y buses llenos (${PEAK_LABEL})` : `Fuera de hora punta · la hora punta es ${PEAK_LABEL}`}
-            </p>
-          );
-        })()}
-        <div className="mb-4 mt-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="flex items-center gap-3 text-lg text-ink"><Step n={2} />¿Qué tramo vas a hacer?</h2>
-          {!libre && (
+        {!libre && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-primary-soft px-3 py-1 text-sm text-primary-text">Por {netName}</span>
             <button type="button" onClick={locate} disabled={locating}
-              className="inline-flex items-center gap-2 rounded-full border border-line px-4 py-2 text-sm text-ink hover:bg-surface-muted">
+              className="inline-flex items-center gap-2 rounded-full border border-line px-3 py-1 text-sm text-ink hover:bg-surface-muted">
               {locating ? <Loader2 className="size-4 animate-spin" /> : <LocateFixed className="size-4" />}
               Paradero más cercano
             </button>
-          )}
-        </div>
+          </div>
+        )}
         {libre ? (
           <div className="grid items-start gap-3 sm:grid-cols-[1fr_auto_1fr]">
             <PlaceSearch id="origin" label="Desde" value={p.origin} onChange={p.onOrigin} locate saved={saved} onSaved={setSaved} />
-            <ArrowDown className="mx-auto mt-2 size-5 text-subtle sm:mt-11 sm:-rotate-90" aria-hidden />
+            <ArrowDown className="mx-auto size-5 text-subtle sm:mt-11 sm:-rotate-90" aria-hidden />
             <PlaceSearch id="dest" label="Hasta" value={p.dest} onChange={p.onDest} saved={saved} onSaved={setSaved} />
           </div>
         ) : (
-        <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
-          <StopSelect id="from" label="Desde" value={p.from} groups={p.fromGroups} placeholder="Elige tu paradero" onChange={p.onFrom} />
-          <ArrowDown className="mx-auto mb-3 size-5 text-subtle sm:-rotate-90" aria-hidden />
-          <StopSelect
-            id="to" label="Hasta" value={p.to} groups={p.toGroups}
-            placeholder={p.from ? "Elige tu destino" : "Primero elige desde dónde"}
-            disabled={!p.from} onChange={p.onTo}
-          />
-        </div>
+          <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto_1fr]">
+            <StopSelect id="from" label="Desde" value={p.from} groups={p.fromGroups} placeholder="Elige tu paradero" onChange={p.onFrom} />
+            <ArrowDown className="mx-auto mb-3 size-5 text-subtle sm:-rotate-90" aria-hidden />
+            <StopSelect id="to" label="Hasta" value={p.to} groups={p.toGroups}
+              placeholder={p.from ? "Elige tu destino" : "Primero elige desde dónde"} disabled={!p.from} onChange={p.onTo} />
+          </div>
         )}
         {locateMsg && <p className="mt-2 text-sm text-muted">{locateMsg}</p>}
       </div>
 
-      {/* Objetivo */}
-      <fieldset className="mt-8">
-        <legend id="goal-title" className="mb-4 flex items-center gap-3 text-lg text-ink"><Step n={3} />¿Qué buscas hoy?</legend>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {goals.map((g) => {
-            const active = g.id === p.goal;
-            return (
-              <label
-                key={g.id}
-                className={cx(
-                  "flex cursor-pointer items-center gap-4 rounded-tile border-2 px-5 py-4 transition",
-                  active ? "border-primary bg-primary-soft text-primary-text" : "border-line bg-surface-muted text-ink hover:border-subtle",
-                )}
-              >
-                <input
-                  type="radio" name="goal" value={g.id} checked={active}
-                  onChange={() => p.onGoalChange(g.id)}
-                  className="size-5 accent-[var(--primary)]"
-                />
-                <Icon name={g.icon} className="size-5 text-muted" />
-                <span className="text-lg">{g.label}</span>
+      <Button className="mt-6 w-full" onClick={p.onCalculate} disabled={p.loading || !ready}
+        icon={p.loading ? <Farol lit className="size-5 motion-safe:animate-pulse" /> : null}>
+        {p.loading ? "Calculando…" : "¿Cómo me conviene ir?"}
+      </Button>
+
+      {/* Ajustes del viaje: plegados, con lo último que elegiste */}
+      <button type="button" onClick={() => setSheet(true)} aria-haspopup="dialog"
+        className="mt-4 flex w-full items-center gap-3 rounded-control border border-line bg-surface px-4 py-3 text-left hover:bg-surface-muted">
+        <SlidersHorizontal className="size-5 shrink-0 text-muted" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium text-ink">Ajustes del viaje</span>
+          <span className="block truncate text-xs text-muted">{summary}</span>
+        </span>
+        <ChevronDown className="size-5 shrink-0 text-subtle" aria-hidden />
+      </button>
+
+      {sheet && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="ajustes-title">
+          <button type="button" aria-label="Cerrar ajustes" onClick={() => setSheet(false)} className="absolute inset-0 bg-black/45" />
+          <div className="relative max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-t-card bg-surface px-6 pb-7 pt-3 shadow-xl sm:rounded-card">
+            <span aria-hidden className="mx-auto mb-3 block h-1 w-10 rounded-full bg-line sm:hidden" />
+            <h3 id="ajustes-title" className="text-lg font-semibold text-ink">Ajustes del viaje</h3>
+            <p className="text-xs text-muted">Se guardan para la próxima vez.</p>
+
+            <div className="divide-y divide-line">
+              <label className="flex items-center gap-3 py-3.5 text-ink">
+                <span className="flex-1">Normalmente voy en</span>
+                <select value={p.usual} onChange={(e) => p.onUsual(e.target.value as UsualMode)}
+                  className="rounded-control border border-line bg-surface-muted px-3 py-2 font-medium text-primary focus:border-primary">
+                  {(Object.keys(USUAL_LABEL) as UsualMode[]).map((k) => <option key={k} value={k}>{USUAL_LABEL[k][0].toUpperCase() + USUAL_LABEL[k].slice(1)}</option>)}
+                </select>
               </label>
-            );
-          })}
-        </div>
-      </fieldset>
-
-      <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-ink">
-        <span className="text-sm text-muted">Para este tramo tengo:</span>
-        <label className="inline-flex cursor-pointer items-center gap-2">
-          <input type="checkbox" checked={p.hasBike} onChange={(e) => p.onHasBike(e.target.checked)} className="size-5 accent-[var(--primary)]" />
-          <Bike className="size-5 text-muted" /> Bici
-        </label>
-        <label className="inline-flex cursor-pointer items-center gap-2">
-          <input type="checkbox" checked={p.hasScooter} onChange={(e) => p.onHasScooter(e.target.checked)} className="size-5 accent-[var(--primary)]" />
-          <Scooter className="size-5 text-muted" /> Scooter
-        </label>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-ink">
-        <label htmlFor="usual" className="text-sm text-muted">Normalmente hago este tramo en:</label>
-        <select id="usual" value={p.usual} onChange={(e) => p.onUsual(e.target.value as UsualMode)}
-          className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
-          {(Object.keys(USUAL_LABEL) as UsualMode[]).map((k) => <option key={k} value={k}>{USUAL_LABEL[k]}</option>)}
-        </select>
-        <label className="inline-flex cursor-pointer items-center gap-2">
-          <input type="checkbox" checked={p.roundTrip} onChange={(e) => p.onRoundTrip(e.target.checked)} className="size-5 accent-[var(--primary)]" />
-          Ida y vuelta
-        </label>
-        <span className="w-full text-xs text-muted">El ahorro se calcula contra esto.</span>
-      </div>
-      {p.usual === "auto" && (
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-ink">
-          <label htmlFor="cartype" className="text-sm text-muted">Mi auto es:</label>
-          <select id="cartype" value={p.car.type} onChange={(e) => p.onCar({ ...p.car, type: e.target.value as CarType })}
-            className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
-            {(Object.keys(CAR_LABEL) as CarType[]).map((k) => <option key={k} value={k}>{CAR_LABEL[k]} · ~{CAR_KMPG[k]} km/gal</option>)}
-          </select>
-          <label htmlFor="parking" className="text-sm text-muted">Parqueo:</label>
-          <select id="parking" value={p.car.parking} onChange={(e) => p.onCar({ ...p.car, parking: Number(e.target.value) })}
-            className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
-            <option value={0}>No pago</option>
-            <option value={5}>S/ 5</option>
-            <option value={10}>S/ 10</option>
-            <option value={15}>S/ 15 o más</option>
-          </select>
+              {p.usual === "auto" && (
+                <div className="flex flex-wrap items-center gap-3 py-3.5 text-ink">
+                  <label htmlFor="cartype" className="text-sm text-muted">Mi auto</label>
+                  <select id="cartype" value={p.car.type} onChange={(e) => p.onCar({ ...p.car, type: e.target.value as CarType })}
+                    className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
+                    {(Object.keys(CAR_LABEL) as CarType[]).map((k) => <option key={k} value={k}>{CAR_LABEL[k]} · ~{CAR_KMPG[k]} km/gal</option>)}
+                  </select>
+                  <label htmlFor="parking" className="text-sm text-muted">Parqueo</label>
+                  <select id="parking" value={p.car.parking} onChange={(e) => p.onCar({ ...p.car, parking: Number(e.target.value) })}
+                    className="rounded-control border border-line bg-surface-muted px-3 py-2 text-ink focus:border-primary">
+                    <option value={0}>No pago</option><option value={5}>S/ 5</option><option value={10}>S/ 10</option><option value={15}>S/ 15 o más</option>
+                  </select>
+                </div>
+              )}
+              <label className="flex cursor-pointer items-center gap-3 py-3.5 text-ink">
+                <span className="flex-1">Ida y vuelta</span>
+                <input type="checkbox" checked={p.roundTrip} onChange={(e) => p.onRoundTrip(e.target.checked)} className="size-5 accent-[var(--primary)]" />
+              </label>
+              <div className="py-3.5">
+                <p className="text-ink">Además de caminar, tengo</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {([["bici", p.hasBike, p.onHasBike, <Bike key="b" className="size-4" />], ["scooter", p.hasScooter, p.onHasScooter, <Scooter key="s" className="size-4" />]] as const).map(([name, on, set, ic]) => (
+                    <button key={name} type="button" aria-pressed={on} onClick={() => set(!on)}
+                      className={cx("inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
+                        on ? "border-primary bg-primary text-primary-fg" : "border-line text-ink hover:bg-surface-muted")}>
+                      {ic}{name[0].toUpperCase() + name.slice(1)}
+                    </button>
+                  ))}
+                  {!p.hasBike && !p.hasScooter && <span className="self-center text-xs text-muted">Nada más: caminas y usas transporte público.</span>}
+                </div>
+              </div>
+              <fieldset className="py-3.5">
+                <legend className="text-ink">Hoy quiero</legend>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {goals.map((g) => {
+                    const active = g.id === p.goal;
+                    return (
+                      <label key={g.id} className={cx("inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-sm",
+                        active ? "border-primary bg-primary text-primary-fg" : "border-line text-ink hover:bg-surface-muted")}>
+                        <input type="radio" name="goal" value={g.id} checked={active} onChange={() => p.onGoalChange(g.id)} className="sr-only" />
+                        <Icon name={g.icon} className="size-4" />{g.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              <div className="py-3.5">
+                <p className="text-ink">Buscar por</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {[{ id: "libre" as const, name: "Dirección" }, ...p.networks.map((n) => ({ id: n.id, name: n.name }))].map((n) => {
+                    const active = n.id === p.networkId;
+                    return (
+                      <button key={n.id} type="button" aria-pressed={active} onClick={() => p.onNetwork(n.id)}
+                        className={cx("rounded-full border px-3 py-1.5 text-sm",
+                          active ? "border-primary bg-primary text-primary-fg" : "border-line text-ink hover:bg-surface-muted")}>
+                        {n.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {!libre && (() => {
+                  const peak = isPeak(new Date());
+                  return <p className="mt-2 text-xs text-muted">{peak ? `Hora punta ahora (${PEAK_LABEL}): buses llenos.` : `La hora punta es ${PEAK_LABEL}.`}</p>;
+                })()}
+              </div>
+            </div>
+            <Button className="mt-4 w-full" onClick={() => setSheet(false)}>Listo</Button>
+          </div>
         </div>
       )}
-
-      <div className="mt-8">
-        <Button
-          className="w-full sm:w-auto sm:px-10"
-          onClick={p.onCalculate}
-          disabled={p.loading || !ready}
-          icon={p.loading ? <Farol lit className="size-5 motion-safe:animate-pulse" /> : null}
-        >
-          {p.loading ? "Calculando…" : "Calcular recomendación"}
-        </Button>
-      </div>
     </Card>
   );
 }
