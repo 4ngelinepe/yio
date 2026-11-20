@@ -418,6 +418,7 @@ export default function App() {
       {tripDone && (
         <TripDone trip={tripDone}
           onSave={() => { const t = tripDone; setTripDone(null); if (result) void save(t); }}
+          onSaveEstimate={() => { setTripDone(null); if (result) void save(); }}
           onDiscard={() => setTripDone(null)} />
       )}
 

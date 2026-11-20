@@ -36,6 +36,7 @@ export function TripBar({ state, error, onStop, onCancel }: {
           </p>
           <p className="truncate text-xs text-muted">
             {error ?? (waiting ? "Buscando señal de GPS…" : state.paused ? "Hubo una pausa: ¿se bloqueó el celular? Déjalo con YIO abierta." : "Deja YIO abierta y la pantalla encendida.")}
+            {state.accuracy != null && <span className={state.accuracy > 80 ? "text-warning-text" : ""}> · GPS ±{state.accuracy} m</span>}
           </p>
         </div>
         <button type="button" onClick={onCancel} aria-label="Cancelar el viaje sin guardar" className="rounded-full p-2 text-subtle hover:bg-surface-muted"><X className="size-5" /></button>
@@ -46,7 +47,8 @@ export function TripBar({ state, error, onStop, onCancel }: {
 }
 
 /** Lo que se midió, con la opción de registrarlo. */
-export function TripDone({ trip, onSave, onDiscard }: { trip: TripResult; onSave: () => void; onDiscard: () => void }) {
+export function TripDone({ trip, onSave, onSaveEstimate, onDiscard }: { trip: TripResult; onSave: () => void; onSaveEstimate: () => void; onDiscard: () => void }) {
+  const failed = trip.km < 0.05;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="trip-done">
       <button type="button" aria-label="Cerrar" onClick={onDiscard} className="absolute inset-0 bg-black/45" />
@@ -58,8 +60,14 @@ export function TripDone({ trip, onSave, onDiscard }: { trip: TripResult; onSave
           <div className="rounded-tile bg-surface-muted p-3"><dt className="text-xs text-muted">Tiempo</dt><dd className="text-lg font-semibold tabular-nums text-ink">{trip.minutes} min</dd></div>
           <div className="rounded-tile bg-surface-muted p-3"><dt className="text-xs text-muted">Velocidad</dt><dd className="text-lg font-semibold tabular-nums text-ink">{trip.avgKmh || "—"} km/h</dd></div>
         </dl>
-        <p className="mt-3 text-sm text-muted">{GUESS[trip.guess]} Solo guardamos distancia y tiempo, no el recorrido.</p>
-        <Button className="mt-5 w-full" onClick={onSave} disabled={trip.km < 0.05}>Registrar este tramo medido</Button>
+        {failed ? (
+          <p className="mt-3 text-sm text-muted">No pudimos medir la distancia: el GPS no dio puntos precisos (pasa bajo techo, entre edificios altos o con el celular bloqueado). Puedes registrar el viaje con la distancia estimada.</p>
+        ) : (
+          <p className="mt-3 text-sm text-muted">{GUESS[trip.guess]} Solo guardamos distancia y tiempo, no el recorrido.</p>
+        )}
+        {failed
+          ? <Button className="mt-5 w-full" onClick={onSaveEstimate}>Registrar con la distancia estimada</Button>
+          : <Button className="mt-5 w-full" onClick={onSave}>Registrar este tramo medido</Button>}
         <button type="button" onClick={onDiscard} className="mt-3 w-full text-sm text-muted underline">Descartar</button>
       </div>
     </div>

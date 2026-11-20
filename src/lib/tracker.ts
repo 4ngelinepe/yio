@@ -11,6 +11,8 @@ export type TrackState = {
   last?: { lat: number; lng: number; t: number };
   accuracy?: number;
   paused?: boolean;
+  /** Hora del último dato del GPS (aunque no haya sumado). */
+  lastFix?: number;
 };
 
 export type TripResult = { km: number; minutes: number; avgKmh: number; maxKmh: number; guess: "walk" | "bike-or-bus" | "vehicle" | "unknown" };
@@ -32,6 +34,8 @@ const saveTrip = (s: TrackState | null) => { try { s ? localStorage.setItem(KEY,
 export class Tracker {
   state: TrackState;
   private watch: number | null = null;
+  /** Últimos puntos buenos: se promedian para quitar el temblor del GPS. */
+  private buf: { lat: number; lng: number }[] = [];
   private lock: { release: () => Promise<void> } | null = null;
   private onVis = () => { if (document.visibilityState === "visible") void this.keepAwake(); };
 
@@ -61,21 +65,29 @@ export class Tracker {
     const t = p.timestamp;
     const s = this.state;
     s.accuracy = Math.round(accuracy);
-    if (accuracy > 50) { this.onUpdate({ ...s }); return; } // punto impreciso: no suma
-    if (s.last) {
-      const dKm = hav(s.last, { lat, lng });
-      const dt = (t - s.last.t) / 1000;
-      if (dt <= 0) return;
+    // Hubo un hueco largo sin señal: probablemente se bloqueó el celular.
+    s.paused = s.lastFix != null && t - s.lastFix > 90_000;
+    s.lastFix = t;
+    if (accuracy > 80) { saveTrip(s); this.onUpdate({ ...s }); return; } // punto muy impreciso: no suma
+    this.buf.push({ lat, lng });
+    if (this.buf.length > 5) this.buf.shift();
+    const pos = { lat: this.buf.reduce((a, b) => a + b.lat, 0) / this.buf.length, lng: this.buf.reduce((a, b) => a + b.lng, 0) / this.buf.length };
+    if (!s.last) { s.last = { ...pos, t }; saveTrip(s); this.onUpdate({ ...s }); return; }
+    // Se mide desde un punto ancla: los pasos chicos se acumulan hasta superar el margen de error,
+    // y recién ahí se suma el tramo y se mueve el ancla. Así no se cuenta el temblor del GPS estando quieta.
+    const dKm = hav(s.last, pos);
+    const dt = (t - s.last.t) / 1000;
+    if (dt <= 0) return;
+    const margin = Math.min(40, Math.max(15, accuracy)) / 1000;
+    if (dKm >= margin) {
       const kmh = (dKm / dt) * 3600;
-      if (kmh > 130) return; // salto del GPS, se ignora
-      if (dKm * 1000 > Math.max(4, accuracy * 0.5)) { // movimiento real, no ruido estando quieto
+      if (kmh <= 130) { // más rápido que eso es un salto del GPS: se ignora el punto
         s.km += dKm;
         s.movingSec += dt;
         if (dt >= 3) s.maxKmh = Math.max(s.maxKmh, kmh);
+        s.last = { ...pos, t };
       }
-      s.paused = dt > 90; // hubo un hueco largo: probablemente se bloqueó el celular
     }
-    s.last = { lat, lng, t };
     saveTrip(s);
     this.onUpdate({ ...s });
   }
